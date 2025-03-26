@@ -25,7 +25,6 @@ class TelegramBot:
 
     def _register_handlers(self):
         """Регистрация обработчиков команд и callback запросов."""
-        # Регистрация хендлеров с использованием современного синтаксиса aiogram
         self.dp.message(CommandStart())(self.send_welcome)
         self.dp.callback_query(F.data == "get_pdf_report")(self.send_pdf_report)
         self.dp.callback_query(F.data == "get_text_report")(self.send_text_report)
@@ -65,6 +64,11 @@ class TelegramBot:
                 await callback.message.answer_document(FSInputFile(pdf_path))
             else:
                 await callback.message.answer("❌ Не удалось сгенерировать PDF отчёт.")
+            # Отправляем клавиатуру с выбором отчётов после отправки
+            await callback.message.answer(
+                "Выберите другой отчёт:",
+                reply_markup=self.get_report_buttons()
+            )
             await callback.answer()
         except Exception as e:
             logger.error(f"Ошибка при отправке PDF отчёта: {e}")
@@ -73,7 +77,7 @@ class TelegramBot:
 
     async def send_text_report(self, callback: CallbackQuery):
         """Отправка текстового отчёта."""
-        text_report_path = "reports/text_report.txt"
+        text_report_path = "reports/ai_report.txt"
         try:
             if not os.path.exists(text_report_path):
                 await callback.message.answer("⌛ Текстовый отчёт генерируется...")
@@ -88,6 +92,11 @@ class TelegramBot:
                 await callback.message.answer(report_text)
             else:
                 await callback.message.answer("❌ Не удалось сгенерировать текстовый отчёт.")
+            # Отправляем клавиатуру с выбором отчётов после отправки
+            await callback.message.answer(
+                "Выберите другой отчёт:",
+                reply_markup=self.get_report_buttons()
+            )
             await callback.answer()
         except Exception as e:
             logger.error(f"Ошибка при отправке текстового отчёта: {e}")
@@ -104,6 +113,11 @@ class TelegramBot:
             else:
                 await callback.message.answer("❌ Диаграмма не найдена.")
                 await callback.answer()
+            # Отправляем клавиатуру с выбором отчётов после отправки
+            await callback.message.answer(
+                "Выберите другой отчёт:",
+                reply_markup=self.get_report_buttons()
+            )
         except Exception as e:
             logger.error(f"Ошибка при отправке диаграммы: {e}")
             await callback.message.answer("Произошла ошибка при отправке диаграммы.")
