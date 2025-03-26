@@ -19,7 +19,7 @@ class LLMReporter(BaseReporter):
         super().__init__(input_data_path=input_data_path)
         self.model = model
         self.max_tokens = max_tokens
-        openai.api_key = OPENAI_API_KEY
+        openai.api_key = os.getenv.OPENAI_API_KEY
         if not openai.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
 
