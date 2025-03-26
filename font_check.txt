@@ -1,0 +1,5 @@
+Built-in fonts don't support Cyrillic
+DejaVuSans failed: TTF Font file not found: DejaVuSans.ttf
+ArialUnicodeMS failed: TTF Font file not found: arialuni.ttf
+
+Solution: Install a Unicode font like DejaVu or Arial Unicode MS
