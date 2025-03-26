@@ -3,6 +3,11 @@ import os
 import pandas as pd
 from collections import Counter
 from src.reporting.base_reporter import BaseReporter
+from dotenv import load_dotenv
+load_dotenv()
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
 
 class LLMReporter(BaseReporter):
     """
@@ -14,7 +19,9 @@ class LLMReporter(BaseReporter):
         super().__init__(input_data_path=input_data_path)
         self.model = model
         self.max_tokens = max_tokens
-        openai.api_key = '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' 
+        openai.api_key = os.getenv.OPENAI_API_KEY
+        if not openai.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
 
     def _preprocess_messages(self, messages):
         """
