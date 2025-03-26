@@ -28,14 +28,26 @@ class TelegramBot:
         self.dp.message(CommandStart())(self.send_welcome)
         self.dp.callback_query(F.data == "get_pdf_report")(self.send_pdf_report)
         self.dp.callback_query(F.data == "get_text_report")(self.send_text_report)
-        self.dp.callback_query(F.data == "get_chart")(self.send_chart)
+        self.dp.callback_query(F.data == "chart_selection")(self.send_chart)
+        self.dp.callback_query(F.data == "back_to_reports")(self.back_to_reports)
+        self.dp.callback_query(F.data.startswith("get_"))(self.handle_chart_selection)
 
     def get_report_buttons(self):
         """Создание инлайн-клавиатуры с кнопками отчетов."""
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📄 PDF отчёт", callback_data="get_pdf_report")],
             [InlineKeyboardButton(text="📜 Текстовый отчёт", callback_data="get_text_report")],
-            [InlineKeyboardButton(text="📊 График", callback_data="get_chart")]
+            [InlineKeyboardButton(text="📊 Графики", callback_data="chart_selection")]
+        ])
+        return keyboard
+
+    def get_chart_buttons(self):
+        """Создание инлайн-клавиатуры с выбором графиков."""
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📈 Тренды сообщений", callback_data="get_message_trends")],
+            [InlineKeyboardButton(text="😊 Распределение тональности", callback_data="get_sentiment_distribution")],
+            [InlineKeyboardButton(text="🔑 Ключевые слова", callback_data="get_top_keywords")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_reports")]
         ])
         return keyboard
 
@@ -104,23 +116,51 @@ class TelegramBot:
             await callback.answer()
 
     async def send_chart(self, callback: CallbackQuery):
-        """Отправка диаграммы."""
-        chart_path = "data/processed/chart.png"
+        """Обработчик выбора графиков."""
+        await callback.message.answer(
+            "Выберите тип графика:",
+            reply_markup=self.get_chart_buttons()
+        )
+        await callback.answer()
+
+    async def handle_chart_selection(self, callback: CallbackQuery):
+        """Обработчик выбора конкретного графика."""
+        chart_type = callback.data
+        chart_map = {
+            "get_message_trends": "message_trends.png",
+            "get_sentiment_distribution": "sentiment_distribution.png", 
+            "get_top_keywords": "top_keywords.png"
+        }
+
+        chart_path = f"reports/visualizations/{chart_map[chart_type]}"
         try:
+            if not os.path.exists(chart_path):
+                await callback.message.answer("⌛ Генерируем график...")
+                from src.visualization.generate_charts import main
+                main()
+                
             if os.path.exists(chart_path):
                 await callback.message.answer_photo(FSInputFile(chart_path))
-                await callback.answer()
             else:
-                await callback.message.answer("❌ Диаграмма не найдена.")
-                await callback.answer()
-            # Отправляем клавиатуру с выбором отчётов после отправки
+                await callback.message.answer("❌ Не удалось сгенерировать график.")
+            
             await callback.message.answer(
-                "Выберите другой отчёт:",
-                reply_markup=self.get_report_buttons()
+                "Выберите другой график:",
+                reply_markup=self.get_chart_buttons()
             )
+            await callback.answer()
         except Exception as e:
-            logger.error(f"Ошибка при отправке диаграммы: {e}")
-            await callback.message.answer("Произошла ошибка при отправке диаграммы.")
+            logger.error(f"Ошибка при отправке графика: {e}")
+            await callback.message.answer("❌ Ошибка: " + str(e))
+            await callback.answer()
+
+    async def back_to_reports(self, callback: CallbackQuery):
+        """Возврат к выбору отчетов."""
+        await callback.message.answer(
+            "Выберите нужный отчёт:",
+            reply_markup=self.get_report_buttons()
+        )
+        await callback.answer()
 
     async def start(self):
         """Запуск бота."""
