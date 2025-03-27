@@ -101,7 +101,15 @@ class TelegramBot:
             if os.path.exists(text_report_path):
                 with open(text_report_path, 'r') as f:
                     report_text = f.read()
-                await callback.message.answer(report_text)
+                
+                # Split long messages into chunks of 4000 chars to stay under Telegram's limit
+                chunk_size = 4000
+                chunks = [report_text[i:i+chunk_size] for i in range(0, len(report_text), chunk_size)]
+                
+                for i, chunk in enumerate(chunks, 1):
+                    prefix = f"Часть {i} из {len(chunks)}:\n" if len(chunks) > 1 else ""
+                    await callback.message.answer(prefix + chunk)
+                    await asyncio.sleep(0.5)  # Small delay between chunks
             else:
                 await callback.message.answer("❌ Не удалось сгенерировать текстовый отчёт.")
             # Отправляем клавиатуру с выбором отчётов после отправки

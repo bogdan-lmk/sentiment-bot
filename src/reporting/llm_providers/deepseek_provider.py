@@ -9,7 +9,7 @@ class DeepSeekProvider(BaseLLMProvider):
     def __init__(self, api_key: str, model: str = "deepseek-reasoner"):
         self.api_key = api_key
         self.model = model
-        self.base_url = "https://api.deepseek.com/v1"
+        self.base_url = "https://api.deepseek.com"
 
     def generate(self, prompt: str, system_message: Optional[str] = None, **kwargs) -> Optional[str]:
         """Generate text using DeepSeek API."""
