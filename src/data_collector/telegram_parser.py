@@ -15,7 +15,7 @@ class TelegramParser:
         self.api_id = int(os.getenv("TELEGRAM_API_ID"))
         self.api_hash = os.getenv("TELEGRAM_API_HASH")
         self.phone = os.getenv("TELEGRAM_PHONE")
-        self.chat_id = os.getenv("CHAT_LINK")
+        self.chat_id = '-1002239405289,-1001590941393,-1001200251912,-1001342547202'
 
     async def _fetch_messages(self) -> Optional[List[Dict]]:
         """Fetch messages from Telegram chat"""
@@ -33,28 +33,52 @@ class TelegramParser:
                 raise ValueError("No phone number provided and no valid session exists")
             await client.start(self.phone)
         
-        try:
-            # Handle both numeric IDs and usernames
-            chat_id = int(self.chat_id) if self.chat_id.lstrip('-').isdigit() else self.chat_id
-            entity = await client.get_entity(chat_id)
-            logger.info(f"Successfully accessed chat: {entity.title if hasattr(entity, 'title') else entity.id}")
-            
-            messages = []
-            async for message in client.iter_messages(entity, limit=100):
-                if message.text:
-                    messages.append({
-                        "date": message.date.strftime("%Y-%m-%d %H:%M:%S"),
-                        "author": message.sender_id,
-                        "text": message.text
-                    })
-            return messages
-        except Exception as e:
-            logger.error(f"Failed to fetch messages: {e}")
-            logger.error("Please ensure:")
-            logger.error("1. You're signed in as the correct user")
-            logger.error("2. You've joined the channel")
-            logger.error(f"3. Chat ID {self.chat_id} is correct")
-            return None
+        messages = []
+        chat_ids = [cid.strip() for cid in self.chat_id.split(',')]
+        
+        for chat_id in chat_ids:
+            try:
+                # Handle numeric IDs, usernames, and channel IDs with suffixes
+                if '_' in chat_id:
+                    # Keep channel IDs with suffixes as strings
+                    entity = await client.get_entity(chat_id)
+                else:
+                    # Convert regular numeric IDs to integers
+                    chat_id = int(chat_id) if chat_id.lstrip('-').isdigit() else chat_id
+                    entity = await client.get_entity(chat_id)
+                logger.info(f"Successfully accessed chat: {entity.title if hasattr(entity, 'title') else entity.id}")
+                
+                # Calculate date 30 days ago
+                from datetime import datetime, timedelta
+                date_limit = datetime.now() - timedelta(days=30)
+                
+                # Process messages in batches to avoid rate limits
+                batch_size = 500
+                total_messages = 0
+                async for message in client.iter_messages(entity, limit=500, offset_date=date_limit):
+                    if message.text:
+                        messages.append({
+                            "date": message.date.strftime("%Y-%m-%d %H:%M:%S"),
+                            "author": message.sender_id,
+                            "text": message.text,
+                            "chat_id": chat_id
+                        })
+                        total_messages += 1
+                        
+                        # Stop if we've reached 500 messages for this chat
+                        if total_messages >= 500:
+                            logger.info(f"Reached 500 message limit for chat {chat_id}")
+                            break
+                            
+                        # Save batch periodically and sleep to avoid rate limits
+                        if len(messages) % batch_size == 0:
+                            logger.info(f"Processed {total_messages} messages from chat {chat_id}")
+                            await asyncio.sleep(1)  # Brief pause between batches
+            except Exception as e:
+                logger.error(f"Failed to fetch messages from chat {chat_id}: {e}")
+                continue
+                
+        return messages if messages else None
 
     async def parse_messages(self, output_path: str = "data/raw/messages.csv") -> bool:
         """Parse messages from Telegram group and save to CSV"""
@@ -62,13 +86,20 @@ class TelegramParser:
         messages = await self._fetch_messages()
         
         if not messages:
-            logger.warning("No messages found in the chat")
+            logger.warning("No messages found in any chat")
             return False
             
         try:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            pd.DataFrame(messages).to_csv(output_path, index=False)
-            logger.info(f"Saved {len(messages)} messages to {output_path}")
+            df = pd.DataFrame(messages)
+            
+            # Append to existing file if it exists
+            if os.path.exists(output_path):
+                existing_df = pd.read_csv(output_path)
+                df = pd.concat([existing_df, df]).drop_duplicates(subset=['date', 'author', 'text', 'chat_id'])
+                
+            df.to_csv(output_path, index=False)
+            logger.info(f"Saved {len(messages)} messages from {len(set(m['chat_id'] for m in messages))} chats to {output_path}")
             return True
         except Exception as e:
             logger.error(f"Failed to save messages: {e}")
