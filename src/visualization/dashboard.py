@@ -1,8 +1,11 @@
+import sys
+import os
+sys.path.append('/Users/buyer7/Desktop/ai-santiment')
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from src.visualization.charts import DataVisualizer  # Assuming charts.py is inside the src/visualization directory
+from src.visualization.charts import DataVisualizer
 
 # Load processed data (e.g., sentiment analysis, keywords, etc.)
 def load_data():
@@ -26,7 +29,10 @@ def create_dashboard():
 
     # Display sentiment analysis summary
     st.subheader('Sentiment Analysis')
-    sentiment_count = sentiment_df['sentiment'].value_counts()
+    try:
+        sentiment_count = sentiment_df['sentiment'].value_counts()
+    except KeyError:
+        sentiment_count = sentiment_df['category'].value_counts()
     st.write('### Sentiment Distribution')
     st.bar_chart(sentiment_count)
 
