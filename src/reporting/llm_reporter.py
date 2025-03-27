@@ -156,8 +156,8 @@ class LLMReporter(BaseReporter):
             4. Проанализируй географию и источники информации
             5. Используй структурированный формат с заголовками
 
-            Для анализа используй первые 100 сообщений:
-            {chr(10).join(messages[:100])}
+            Для анализа используй первые 300 сообщений:
+            {chr(10).join(messages[:300])}
             """
 
             # Generate report using the selected provider
@@ -186,6 +186,100 @@ class LLMReporter(BaseReporter):
         except Exception as e:
             print(f"Ошибка при генерации отчета через GPT: {e}")
             return f"LLM report unavailable - error: {e}"
+
+    def generate_short_report(self):
+        """
+        Создает аналитический отчет с ключевыми выводами.
+        """
+        try:
+            # Проверка на наличие файла перед загрузкой
+            messages_file_path = os.path.join("data/raw", "messages.csv")
+            if not os.path.exists(messages_file_path):
+                print(f"Файл {messages_file_path} не найден.")
+                return "No messages data found"
+
+            # Загружаем данные сообщений
+            messages_df = pd.read_csv(messages_file_path)
+            messages = messages_df["text"].dropna().tolist()
+
+            if not messages:
+                print("Нет данных для анализа.")
+                return "No messages to analyze"
+
+            # Загружаем данные анализа тональности, если доступны
+            sentiment_stats = {}
+            sentiment_path = os.path.join("data/processed", "sentiment_analysis.csv")
+            if os.path.exists(sentiment_path):
+                sentiment_df = pd.read_csv(sentiment_path)
+                sentiment_stats = {
+                    'positive': len(sentiment_df[sentiment_df['category'] == 'позитив']),
+                    'negative': len(sentiment_df[sentiment_df['category'] == 'негатив']),
+                    'neutral': len(sentiment_df[sentiment_df['category'] == 'нейтрально']),
+                    'total': len(sentiment_df)
+                }
+
+            # Формирование краткого промпта
+            prompt = f"""
+            Создай информативный  аналитический отчет  со следующими ключевыми выводами:
+
+            Основные показатели:
+            - Общее количество сообщений: {len(messages)}
+            {f"- Позитивных сообщений: {sentiment_stats.get('positive', 'N/A')}" if sentiment_stats else ""}
+            {f"- Негативных сообщений: {sentiment_stats.get('negative', 'N/A')}" if sentiment_stats else ""}
+
+            Требования к анализу:
+            1. Выдели  ключевые темы
+            2. Укажи общий эмоциональный фон
+            3. Отметь  важные выводы
+            4. Укажи источники информации
+            5. Укажи географию сообщений
+            6. Используй лаконичный стиль без избыточных деталей
+            
+
+            Пример сообщений:
+            {chr(10).join(messages[:300])}
+            """
+
+            # Generate report using the selected provider
+            system_message = "Ты аналитик данных, создающий краткие и информативные отчеты с ключевыми выводами."
+            report_content = self.provider.generate(
+                prompt,
+                system_message=system_message,
+                max_tokens=4000  # Shorter output
+            )
+            
+            if not report_content:
+                return "Short LLM report unavailable - generation failed"
+
+            # Сохранение отчета
+            try:
+                self.save_report(report_content, "short_llm_report.txt")
+                print("Краткий отчет успешно создан.")
+            except Exception as e:
+                print(f"Ошибка сохранения текстового отчета: {e}")
+                raise
+
+            # Генерация PDF версии
+            try:
+                from src.reporting.pdf_reporter import PDFReporter
+                pdf_reporter = PDFReporter()
+                pdf_reporter.generate_short_report(report_content)
+                print("PDF версия краткого отчета создана.")
+            except Exception as e:
+                print(f"Ошибка создания PDF отчета: {e}")
+                raise
+
+            return report_content
+
+        except Exception as e:
+            error_msg = f"Ошибка при генерации краткого отчета: {str(e)}"
+            print(error_msg)
+            # Проверяем доступность директории reports
+            if not os.path.exists(self.output_dir):
+                error_msg += f"\nДиректория {self.output_dir} не существует"
+            elif not os.access(self.output_dir, os.W_OK):
+                error_msg += f"\nНет прав на запись в директорию {self.output_dir}"
+            return error_msg
 
 def main():
     reporter = LLMReporter()

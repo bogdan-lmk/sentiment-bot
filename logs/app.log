@@ -4,3 +4,4 @@
 2025-03-27 15:33:20,357 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
 2025-03-27 15:37:35,549 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
 2025-03-27 15:40:02,555 - ai-santiment - ERROR - DeepSeek API error: 401 Client Error: Unauthorized for url: https://api.deepseek.com/v1/chat/completions
+2025-03-27 22:56:16,171 - ai-santiment - ERROR - OpenAI API error: The model `deepseek-reasoner` does not exist or you do not have access to it.

@@ -28,6 +28,8 @@ class TelegramBot:
         self.dp.message(CommandStart())(self.send_welcome)
         self.dp.callback_query(F.data == "get_pdf_report")(self.send_pdf_report)
         self.dp.callback_query(F.data == "get_text_report")(self.send_text_report)
+        self.dp.callback_query(F.data == "get_short_pdf_report")(self.send_short_pdf_report)
+        self.dp.callback_query(F.data == "get_short_text_report")(self.send_short_text_report)
         self.dp.callback_query(F.data == "chart_selection")(self.send_chart)
         self.dp.callback_query(F.data == "back_to_reports")(self.back_to_reports)
         self.dp.callback_query(F.data.startswith("get_"))(self.handle_chart_selection)
@@ -35,8 +37,10 @@ class TelegramBot:
     def get_report_buttons(self):
         """Создание инлайн-клавиатуры с кнопками отчетов."""
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📄 PDF отчёт", callback_data="get_pdf_report")],
-            [InlineKeyboardButton(text="📜 Текстовый отчёт", callback_data="get_text_report")],
+            [InlineKeyboardButton(text="📄 Полный PDF отчёт", callback_data="get_pdf_report"),
+             InlineKeyboardButton(text="📄 Краткий PDF отчёт", callback_data="get_short_pdf_report")],
+            [InlineKeyboardButton(text="📜 Полный текстовый отчёт", callback_data="get_text_report"),
+             InlineKeyboardButton(text="📜 Краткий текстовый отчёт", callback_data="get_short_text_report")],
             [InlineKeyboardButton(text="📊 Графики", callback_data="chart_selection")]
         ])
         return keyboard
@@ -159,6 +163,60 @@ class TelegramBot:
             await callback.answer()
         except Exception as e:
             logger.error(f"Ошибка при отправке графика: {e}")
+            await callback.message.answer("❌ Ошибка: " + str(e))
+            await callback.answer()
+
+    async def send_short_pdf_report(self, callback: CallbackQuery):
+        """Отправка краткого PDF отчёта."""
+        pdf_path = "reports/llm_short_report.pdf"
+        try:
+            if not os.path.exists(pdf_path):
+                await callback.message.answer("⌛ Краткий PDF отчёт генерируется...")
+                # Try generating report if not exists
+                from src.reporting.pdf_reporter import PDFReporter
+                reporter = PDFReporter()
+                reporter.generate_short_report()
+                
+            if os.path.exists(pdf_path):
+                await callback.message.answer_document(FSInputFile(pdf_path))
+            else:
+                await callback.message.answer("❌ Не удалось сгенерировать краткий PDF отчёт.")
+            # Отправляем клавиатуру с выбором отчётов после отправки
+            await callback.message.answer(
+                "Выберите другой отчёт:",
+                reply_markup=self.get_report_buttons()
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.error(f"Ошибка при отправке краткого PDF отчёта: {e}")
+            await callback.message.answer("❌ Ошибка: " + str(e))
+            await callback.answer()
+
+    async def send_short_text_report(self, callback: CallbackQuery):
+        """Отправка краткого текстового отчёта."""
+        text_report_path = "reports/short_llm_report.txt"
+        try:
+            if not os.path.exists(text_report_path):
+                await callback.message.answer("⌛ Краткий текстовый отчёт генерируется...")
+                # Try generating report if not exists
+                from src.reporting.llm_reporter import LLMReporter
+                reporter = LLMReporter()
+                reporter.generate_short_report()
+                
+            if os.path.exists(text_report_path):
+                with open(text_report_path, 'r') as f:
+                    report_text = f.read()
+                await callback.message.answer(report_text)
+            else:
+                await callback.message.answer("❌ Не удалось сгенерировать краткий текстовый отчёт.")
+            # Отправляем клавиатуру с выбором отчётов после отправки
+            await callback.message.answer(
+                "Выберите другой отчёт:",
+                reply_markup=self.get_report_buttons()
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.error(f"Ошибка при отправке краткого текстового отчёта: {e}")
             await callback.message.answer("❌ Ошибка: " + str(e))
             await callback.answer()
 

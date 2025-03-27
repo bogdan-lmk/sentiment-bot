@@ -160,3 +160,23 @@ class PDFReporter(BaseReporter):
                 self.generate_pdf_report(report_text, "llm_report.pdf", title)
         except Exception as e:
             print(f"Ошибка при создании PDF-отчета: {e}")
+
+    def generate_short_report(self, report_text=None, chat_names=None):
+        """
+        Создание краткого PDF-отчета.
+        """
+        try:
+            if report_text is None:
+                report_text = self.load_data("short_llm_report.txt")
+                if not report_text:
+                    print("Краткий отчет не найден.")
+                    return
+            
+            if report_text:
+                title = "Краткий Анализ Сообщений"
+                if chat_names:
+                    title += f" ({', '.join(chat_names)})"
+                
+                self.generate_pdf_report(report_text, "llm_short_report.pdf", title)
+        except Exception as e:
+            print(f"Ошибка при создании краткого PDF-отчета: {e}")

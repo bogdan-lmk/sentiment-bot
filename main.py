@@ -75,20 +75,23 @@ def start_reporting():
             logger.error("Processed data files not found in data/processed/")
             return
 
-        # Generate LLM report and get the text
+        # Initialize reporters
         llm_report = LLMReporter(input_data_path="data/processed", provider="deepseek")
-        report_text = llm_report.generate_report()
-        
-        if report_text:
-            # Generate PDF report using the same text
-            pdf_report = PDFReporter(input_data_path="data/processed")
-            pdf_report.generate_report(report_text)
+        pdf_report = PDFReporter(input_data_path="data/processed")
+        csv_report = CSVReporter(input_data_path="data/processed")
 
-            # Generate CSV report
-            csv_report = CSVReporter(input_data_path="data/processed")
+        # Generate full reports
+        report_text = llm_report.generate_report()
+        if report_text:
+            pdf_report.generate_report(report_text)
             csv_report.generate_report()
             
-            logger.info("Reports generated successfully.")
+            # Generate short reports
+            short_report_text = llm_report.generate_short_report()
+            if short_report_text:
+                pdf_report.generate_short_report(short_report_text)
+            
+            logger.info("All reports generated successfully.")
         else:
             logger.error("Failed to generate LLM report text")
     except Exception as e:
