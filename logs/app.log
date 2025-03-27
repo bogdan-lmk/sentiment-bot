@@ -1,0 +1,6 @@
+2025-03-27 15:20:58,938 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
+2025-03-27 15:23:22,613 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
+2025-03-27 15:32:50,450 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
+2025-03-27 15:33:20,357 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
+2025-03-27 15:37:35,549 - ai-santiment - WARNING - DeepSeek provider not fully implemented - needs API details
+2025-03-27 15:40:02,555 - ai-santiment - ERROR - DeepSeek API error: 401 Client Error: Unauthorized for url: https://api.deepseek.com/v1/chat/completions

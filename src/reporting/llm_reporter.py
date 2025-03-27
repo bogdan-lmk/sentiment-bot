@@ -1,15 +1,14 @@
-import openai
 import os
 import pandas as pd
 from collections import Counter
 from src.reporting.base_reporter import BaseReporter
 from dotenv import load_dotenv
 import re
+from typing import Optional
+from src.reporting.llm_providers.openai_provider import OpenAIProvider
+from src.reporting.llm_providers.deepseek_provider import DeepSeekProvider
 
 load_dotenv()
-
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
 
 class LLMReporter(BaseReporter):
     """
@@ -17,13 +16,30 @@ class LLMReporter(BaseReporter):
     с глубоким анализом сообщений, включающий дополнительные аналитические insights.
     """
 
-    def __init__(self, input_data_path="data/processed", model="gpt-3.5-turbo", max_tokens=4000):
+    def __init__(
+        self, 
+        input_data_path="data/processed", 
+        provider="deepseek",  # Default to DeepSeek with OpenAI as fallback
+        model="deepseek-reasoner", 
+        max_tokens=4000
+    ):
         super().__init__(input_data_path=input_data_path)
         self.model = model
         self.max_tokens = max_tokens
-        openai.api_key = OPENAI_API_KEY
-        if not openai.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
+        
+        # Initialize the selected LLM provider
+        if provider == "openai":
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required")
+            self.provider = OpenAIProvider(api_key, model)
+        elif provider == "deepseek":
+            api_key = os.getenv('DEEPSEEK_API_KEY')
+            if not api_key:
+                raise ValueError("DEEPSEEK_API_KEY environment variable is required")
+            self.provider = DeepSeekProvider(api_key, model)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
 
     def _preprocess_messages(self, messages):
         """
@@ -145,18 +161,16 @@ class LLMReporter(BaseReporter):
             {chr(10).join(messages[:30])}
             """
 
-            # Отправка запроса в OpenAI
-            response = openai.ChatCompletion.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "Ты опытный аналитик данных и социальный исследователь, способный выполнять глубокий контент-анализ с выявлением трендов и инсайтов."},
-                    {"role": "user", "content": prompt}
-                ],
+            # Generate report using the selected provider
+            system_message = "Ты опытный аналитик данных и социальный исследователь, способный выполнять глубокий контент-анализ с выявлением трендов и инсайтов."
+            report_content = self.provider.generate(
+                prompt,
+                system_message=system_message,
                 max_tokens=self.max_tokens
             )
-
-            # Извлечение сгенерированного отчета
-            report_content = response["choices"][0]["message"]["content"]
+            
+            if not report_content:
+                return "LLM report unavailable - generation failed"
 
             # Сохранение отчета
             self.save_report(report_content, "ai_report.txt")
@@ -170,9 +184,6 @@ class LLMReporter(BaseReporter):
 
             return report_content
 
-        except openai.error.OpenAIError as e:
-            print(f"Ошибка при обращении к OpenAI API: {e}")
-            return f"LLM report unavailable - API error: {e}"
         except Exception as e:
             print(f"Ошибка при генерации отчета через GPT: {e}")
             return f"LLM report unavailable - error: {e}"

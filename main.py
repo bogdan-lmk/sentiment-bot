@@ -73,7 +73,7 @@ def start_reporting():
             return
 
         # Generate LLM report and get the text
-        llm_report = LLMReporter(input_data_path="data/processed")
+        llm_report = LLMReporter(input_data_path="data/processed", provider="deepseek")
         report_text = llm_report.generate_report()
         
         if report_text:
