@@ -61,10 +61,15 @@ def start_reporting():
     try:
         logger.info("Starting report generation...")
         
-        # Wait for NLP analysis to complete by checking for output files
-        processed_path = "data/processed/messages.csv"
-        if not os.path.exists(processed_path):
-            logger.error(f"Processed data not found at {processed_path}")
+        # Wait for NLP analysis to complete by checking for any output files
+        processed_files = [
+            "keywords.csv",
+            "message_clusters.csv", 
+            "sentiment_analysis.csv",
+            "theme_classification.csv"
+        ]
+        if not any(os.path.exists(f"data/processed/{f}") for f in processed_files):
+            logger.error("Processed data files not found in data/processed/")
             return
 
         # Generate LLM report and get the text

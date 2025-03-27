@@ -85,13 +85,13 @@ class LLMReporter(BaseReporter):
         """
         try:
             # Проверка на наличие файла перед загрузкой
-            messages_file_path = os.path.join(self.input_data_path, "messages.csv")
+            messages_file_path = os.path.join("data/raw", "messages.csv")
             if not os.path.exists(messages_file_path):
                 print(f"Файл {messages_file_path} не найден.")
                 return "No messages data found"
 
             # Загружаем данные сообщений
-            messages_df = self.load_data("messages.csv")
+            messages_df = pd.read_csv(messages_file_path)
             messages = messages_df["text"].dropna().tolist()
 
             if not messages:
@@ -100,7 +100,7 @@ class LLMReporter(BaseReporter):
 
             # Загружаем данные анализа тональности, если доступны
             sentiment_stats = {}
-            sentiment_path = os.path.join(self.input_data_path, "sentiment_analysis.csv")
+            sentiment_path = os.path.join("data/processed", "sentiment_analysis.csv")
             if os.path.exists(sentiment_path):
                 sentiment_df = pd.read_csv(sentiment_path)
                 sentiment_stats = {
@@ -142,7 +142,7 @@ class LLMReporter(BaseReporter):
             6. Используй структурированный формат с заголовками
 
             Для анализа используй первые 100 сообщений:
-            {chr(10).join(messages[:70])}
+            {chr(10).join(messages[:30])}
             """
 
             # Отправка запроса в OpenAI

@@ -26,7 +26,7 @@ def create_dashboard():
 
     # Display sentiment analysis summary
     st.subheader('Sentiment Analysis')
-    sentiment_count = sentiment_df['category'].value_counts()
+    sentiment_count = sentiment_df['sentiment'].value_counts()
     st.write('### Sentiment Distribution')
     st.bar_chart(sentiment_count)
 

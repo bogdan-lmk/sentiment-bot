@@ -1,2 +1,12 @@
-2025-03-26 12:06:50,263 - INFO: Starting comprehensive NLP analysis
-2025-03-26 12:06:50,452 - INFO: Comprehensive NLP analysis completed
+2025-03-27 14:35:35,437 - INFO: Loading dictionaries from /Users/buyer7/.pyenv/versions/3.12.6/lib/python3.12/site-packages/pymorphy3_dicts_ru/data
+2025-03-27 14:35:35,462 - INFO: format: 2.4, revision: 417150, updated: 2022-01-08T22:09:24.565962
+2025-03-27 14:35:36,397 - INFO: Loading dictionaries from /Users/buyer7/.pyenv/versions/3.12.6/lib/python3.12/site-packages/pymorphy3_dicts_uk/data
+2025-03-27 14:35:36,428 - INFO: format: 2.4, revision: 1, updated: 2022-09-13T18:45:24.998984
+2025-03-27 14:35:41,706 - INFO: Начало комплексного NLP-анализа
+2025-03-27 14:48:27,853 - INFO: Loading dictionaries from /Users/buyer7/.pyenv/versions/3.12.6/lib/python3.12/site-packages/pymorphy3_dicts_ru/data
+2025-03-27 14:48:27,878 - INFO: format: 2.4, revision: 417150, updated: 2022-01-08T22:09:24.565962
+2025-03-27 14:48:28,624 - INFO: Loading dictionaries from /Users/buyer7/.pyenv/versions/3.12.6/lib/python3.12/site-packages/pymorphy3_dicts_uk/data
+2025-03-27 14:48:28,647 - INFO: format: 2.4, revision: 1, updated: 2022-09-13T18:45:24.998984
+2025-03-27 14:48:33,254 - INFO: Начало комплексного NLP-анализа
+2025-03-27 14:48:34,387 - INFO: Пропуск анализа тональности - столбец sentiment отсутствует
+2025-03-27 14:48:34,979 - INFO: Комплексный NLP-анализ завершен

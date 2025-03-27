@@ -31,11 +31,11 @@ class CSVReporter(BaseReporter):
             
             # Топ ключевых слов
             report_content += "Топ ключевых слов:\n"
-            if 'keywords' in keywords_data.columns:
+            if 'keyword' in keywords_data.columns:
                 keywords_summary = keywords_data.head(20).to_string(index=False)
                 report_content += keywords_summary + "\n\n"
             else:
-                report_content += "Не найден столбец 'keywords' в keywords.csv\n\n"
+                report_content += "Не найден столбец 'keyword' в keywords.csv\n\n"
             
             # Классификация тем
             report_content += "Классификация тем:\n"
