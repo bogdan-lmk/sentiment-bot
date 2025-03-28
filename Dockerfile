@@ -22,6 +22,7 @@ COPY src/ .
 COPY main.py .
 COPY config/ config/
 COPY data/processed/ data/processed/
+COPY .env .
 
 # Ensure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
