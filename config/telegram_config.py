@@ -2,8 +2,10 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Load environment variables first
-load_dotenv(override=True)
+# Load environment variables first from the project root
+from pathlib import Path
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(env_path, override=True)
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name)

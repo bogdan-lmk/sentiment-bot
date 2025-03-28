@@ -14,8 +14,11 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy project files (excluding patterns in .dockerignore)
 COPY . .
+
+# Ensure .env exists (will be overridden by docker-compose's env_file)
+RUN touch .env
 
 # Run main application
 CMD ["python", "main.py"]
