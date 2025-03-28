@@ -1,0 +1,21 @@
+# Ignore everything by default
+*
+
+# Allow specific files/directories
+!src/
+!main.py
+!config/
+!data/processed/
+!requirements.txt
+
+# Explicitly ignore large directories
+data/raw/
+fonts/
+reports/
+logs/
+sessions/
+*.session
+*.session-journal
+*.pdf
+*.png
+*.html

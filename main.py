@@ -4,6 +4,7 @@
 import os
 import logging
 import asyncio
+import matplotlib.pyplot as plt
 from config.telegram_config import TELEGRAM_BOT_TOKEN, TELEGRAM_REPORT_CHAT_ID
 from src.bot.bot import TelegramBot
 from src.analyzer.keyword_extractor import AdvancedNLPAnalyzer

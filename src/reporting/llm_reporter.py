@@ -159,8 +159,8 @@ class LLMReporter(BaseReporter):
             5. Используй простой текстовый формат без markdown разметки
             6. Remove markdown formatting (##, **, ---)
 
-            Для анализа используй первые 300 сообщений:
-            {chr(10).join(messages[:300])}
+            Для анализа используй первые 500 сообщений:
+            {chr(10).join(messages[:500])}
             """
 
             # Generate report using the selected provider
