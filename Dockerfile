@@ -1,33 +1,34 @@
-# Build stage
-FROM python:3.9-slim as builder
-
-WORKDIR /app
-COPY requirements.txt .
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev && \
-    pip install --user -r requirements.txt && \
-    apt-get remove -y gcc python3-dev && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
-
-# Runtime stage
+# Use official Python base image
 FROM python:3.9-slim
 
+# Аргументы для сборки
+ARG TELEGRAM_API_ID
+ARG TELEGRAM_API_HASH
+ARG TELEGRAM_BOT_TOKEN
+
+# Set work directory
 WORKDIR /app
 
-# Copy all necessary files including setup.py
-COPY --from=builder /root/.local /root/.local
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy project
 COPY . .
 
-# Ensure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
+# Set environment variables for Telegram
+ENV TELEGRAM_API_ID=$TELEGRAM_API_ID
+ENV TELEGRAM_API_HASH=$TELEGRAM_API_HASH
+ENV TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
+ENV TELEGRAM_PHONE=+380662468494
+ENV CHAT_LINK=-1002239405289
+ENV TELEGRAM_REPORT_CHAT_ID=-1002624153500
 
-# Install the package in development mode (must be after COPY)
-RUN pip install -e .
-
-# Clean up
-RUN find /app -type d -name "__pycache__" -exec rm -rf {} + && \
-    find /app -type f -name "*.py[co]" -delete
-
+# Run main application
 CMD ["python", "main.py"]

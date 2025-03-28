@@ -40,8 +40,12 @@ class DataVisualizer:
         try:
             sentiment_counts = self.data['category'].value_counts()
             
+            # Convert index to string to ensure categorical plotting
+            sentiment_counts.index = sentiment_counts.index.astype(str)
+            
             fig = self._create_figure(figsize=(8, 6))
-            sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, hue=sentiment_counts.index, palette='viridis', legend=False)
+            sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, 
+                       hue=sentiment_counts.index, palette='viridis', legend=False)
             
             plt.title('Распределение тональности сообщений', fontsize=14, fontweight='bold')
             plt.xlabel('Категория тональности', fontsize=10)
@@ -102,6 +106,10 @@ class DataVisualizer:
             for col in required_columns:
                 if col not in trend_data.columns:
                     raise ValueError(f"Отсутствует обязательная колонка: {col}")
+            
+            # Ensure date column is datetime
+            trend_data = trend_data.copy()
+            trend_data['date'] = pd.to_datetime(trend_data['date'])
             
             sns.lineplot(x='date', y='0', data=trend_data, color='#1f77b4', linewidth=2)
             
@@ -167,7 +175,9 @@ class DataVisualizer:
                 raise ValueError("sentiment_data должен быть pandas DataFrame")
             
             # Преобразование даты и группировка
-            sentiment_data['hour'] = pd.to_datetime(sentiment_data['date']).dt.hour
+            sentiment_data = sentiment_data.copy()
+            sentiment_data['date'] = pd.to_datetime(sentiment_data['date'])
+            sentiment_data['hour'] = sentiment_data['date'].dt.hour
             sentiment_hourly = sentiment_data.groupby('hour')['category'].value_counts().unstack().fillna(0)
             
             fig = self._create_figure(figsize=(12, 6))

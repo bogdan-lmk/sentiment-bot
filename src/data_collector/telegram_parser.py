@@ -17,8 +17,12 @@ class TelegramParser:
         self.phone = os.getenv("TELEGRAM_PHONE")
         self.chat_id = '-1002239405289,-1001590941393,-1001200251912,-1001342547202'
 
-    async def _fetch_messages(self) -> Optional[List[Dict]]:
-        """Fetch messages from Telegram chat"""
+    async def _fetch_messages(self, output_path: str = "data/raw/messages.csv") -> Optional[List[Dict]]:
+        """Fetch messages from Telegram chat
+        
+        Args:
+            output_path: Path to existing messages CSV file to check for last date
+        """
         client = TelegramClient('sessions/telegram_session', self.api_id, self.api_hash)
         
         try:
@@ -48,14 +52,20 @@ class TelegramParser:
                     entity = await client.get_entity(chat_id)
                 logger.info(f"Successfully accessed chat: {entity.title if hasattr(entity, 'title') else entity.id}")
                 
-                # Calculate date 30 days ago
-                from datetime import datetime, timedelta
-                date_limit = datetime.now() - timedelta(days=30)
+                # Get last message date from existing file if it exists
+                last_date = None
+                if os.path.exists(output_path):
+                    try:
+                        existing_df = pd.read_csv(output_path)
+                        if not existing_df.empty:
+                            last_date = pd.to_datetime(existing_df['date']).max()
+                    except Exception as e:
+                        logger.warning(f"Couldn't read existing messages: {e}")
                 
                 # Process messages in batches to avoid rate limits
                 batch_size = 500
                 total_messages = 0
-                async for message in client.iter_messages(entity, limit=500, offset_date=date_limit):
+                async for message in client.iter_messages(entity, limit=1000, offset_date=last_date):
                     if message.text:
                         messages.append({
                             "date": message.date.strftime("%Y-%m-%d %H:%M:%S"),
@@ -65,7 +75,7 @@ class TelegramParser:
                         })
                         total_messages += 1
                         
-                        # Stop if we've reached 500 messages for this chat
+                        # Stop if we've reached 1000 messages for this chat
                         if total_messages >= 500:
                             logger.info(f"Reached 500 message limit for chat {chat_id}")
                             break
@@ -83,7 +93,7 @@ class TelegramParser:
     async def parse_messages(self, output_path: str = "data/raw/messages.csv") -> bool:
         """Parse messages from Telegram group and save to CSV"""
         logger.info("Fetching messages from Telegram...")
-        messages = await self._fetch_messages()
+        messages = await self._fetch_messages(output_path)
         
         if not messages:
             logger.warning("No messages found in any chat")

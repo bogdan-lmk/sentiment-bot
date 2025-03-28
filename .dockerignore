@@ -1,23 +1,16 @@
-# Ignore everything by default
-*
+# Ignore virtual environment
+venv/
+.env
 
-# Allow specific files/directories
-!src/
-!main.py
-!config/
-!data/processed/
-!requirements.txt
-!.env
-!setup.py
-
-# Explicitly ignore large directories
-data/raw/
-fonts/
-reports/
+# Ignore local logs and data
 logs/
+data/
 sessions/
-*.session
-*.session-journal
-*.pdf
-*.png
-*.html
+
+# Ignore IDE files
+.idea/
+.vscode/
+
+# Ignore temporary files
+*.tmp
+*.swp
