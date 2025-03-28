@@ -4,6 +4,9 @@ FROM python:3.9-slim
 # Set work directory
 WORKDIR /app
 
+ARG TELEGRAM_BOT_TOKEN
+ENV TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
