@@ -7,6 +7,11 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_PHONE=${TELEGRAM_PHONE}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_REPORT_CHAT_ID=${TELEGRAM_REPORT_CHAT_ID}
     restart: unless-stopped
     depends_on:
       - redis
