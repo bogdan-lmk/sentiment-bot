@@ -7,9 +7,6 @@ services:
     container_name: telegram_bot
     restart: always
     environment:
-      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
-      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_PHONE=+380662468494
       - CHAT_LINK=-1002239405289
       - TELEGRAM_REPORT_CHAT_ID=-1002624153500
