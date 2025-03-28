@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class TelegramBot:
-    def __init__(self, token: str = '7558803374:AAG0eQQ9hKy5SYuf9U3PYd-RJw0ciJE2EwI', chat_id: str = TELEGRAM_REPORT_CHAT_ID):
+    def __init__(self, token: str = TELEGRAM_BOT_TOKEN, chat_id: str = TELEGRAM_REPORT_CHAT_ID):
         self.bot = Bot(token=token)
         self.report_chat_id = chat_id
         self.dp = Dispatcher()
