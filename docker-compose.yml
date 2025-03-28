@@ -3,10 +3,9 @@ services:
   app:
     build: 
       context: .
-      args:
-        - TELEGRAM_API_ID=${TELEGRAM_API_ID}
-        - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
-        - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      dockerfile: Dockerfile
+    container_name: telegram_bot
+    restart: always
     environment:
       - TELEGRAM_API_ID=${TELEGRAM_API_ID}
       - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
