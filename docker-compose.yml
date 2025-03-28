@@ -7,10 +7,6 @@ services:
     container_name: telegram_bot
     restart: always
     environment:
-      - TELEGRAM_BOT_TOKEN=7558803374:AAG0eQQ9hKy5SYuf9U3PYd-RJw0ciJE2EwI
-      - TELEGRAM_PHONE=+380662468494
-      - CHAT_LINK=-1002239405289
-      - TELEGRAM_REPORT_CHAT_ID=-1002624153500
       - PYTHONUNBUFFERED=1
     env_file:
       - .env

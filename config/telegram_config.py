@@ -1,8 +1,9 @@
-from dotenv import load_dotenv
 import os
 import sys
+from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables first
+load_dotenv(override=True)
 
 def get_required_env(name: str) -> str:
     value = os.getenv(name)
