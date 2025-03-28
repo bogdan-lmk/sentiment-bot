@@ -66,3 +66,10 @@ logs/
 *.exe
 *.dll
 *.pyd
+
+# Project-specific
+*.session
+reports/
+fonts/
+src/fonts/
+reports/visualizations/

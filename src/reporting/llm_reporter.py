@@ -150,8 +150,6 @@ class LLMReporter(BaseReporter):
             {chr(10).join([f"{source}: {count} упоминаний" for source, count in message_stats['sources'].items()])}
 
             Требования к анализу:
-             Remove markdown formatting (##, **, ---)
-             Remove markdown formatting ( **word**)
             1. Определи основные тематические кластеры сообщений
             2. Проанализируй эмоциональную окраску сообщений (используя предоставленную статистику тональности)
             3. Выдели ключевые проблемы и потребности
@@ -159,8 +157,8 @@ class LLMReporter(BaseReporter):
             5. Используй простой текстовый формат без markdown разметки
             6. Remove markdown formatting (##, **, ---)
 
-            Для анализа используй первые 500 сообщений:
-            {chr(10).join(messages[:500])}
+            Для анализа используй первые 800 сообщений:
+            {chr(10).join(messages[:800])}
             """
 
             # Generate report using the selected provider
