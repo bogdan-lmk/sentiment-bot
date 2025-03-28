@@ -7,6 +7,7 @@
 !config/
 !data/processed/
 !requirements.txt
+!.env
 
 # Explicitly ignore large directories
 data/raw/
