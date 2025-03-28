@@ -4,15 +4,16 @@ from telethon.sync import TelegramClient
 import pandas as pd
 import os
 import asyncio
-from dotenv import load_dotenv
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 class TelegramParser:
     def __init__(self):
-        """Initialize Telegram parser with credentials from .env"""
-        self.api_id = int(os.getenv("TELEGRAM_API_ID"))
+        """Initialize Telegram parser with credentials from environment"""
+        api_id = os.getenv("TELEGRAM_API_ID")
+        if not api_id:
+            raise ValueError("TELEGRAM_API_ID environment variable not set")
+        self.api_id = int(api_id)
         self.api_hash = os.getenv("TELEGRAM_API_HASH")
         self.phone = os.getenv("TELEGRAM_PHONE")
         self.chat_id = '-1002239405289,-1001590941393,-1001200251912,-1001342547202'
