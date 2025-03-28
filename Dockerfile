@@ -16,15 +16,15 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Copy all necessary files
+# Copy all necessary files including setup.py
 COPY --from=builder /root/.local /root/.local
 COPY . .
 
-# Install the package in development mode
-RUN pip install -e .
-
 # Ensure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
+
+# Install the package in development mode (must be after COPY)
+RUN pip install -e .
 
 # Clean up
 RUN find /app -type d -name "__pycache__" -exec rm -rf {} + && \
