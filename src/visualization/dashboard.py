@@ -1,6 +1,8 @@
 import sys
 import os
 import logging
+import matplotlib
+matplotlib.use('Agg')  # Set backend before importing pyplot
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -73,7 +75,8 @@ def create_advanced_sentiment_chart(sentiment_df):
         sentiment_count = sentiment_df[sentiment_col].value_counts()
         
         plt.subplot(121)
-        sns.barplot(x=sentiment_count.index, y=sentiment_count.values, palette='viridis')
+        sns.barplot(x=sentiment_count.index, y=sentiment_count.values, 
+                   hue=sentiment_count.index, palette='viridis', legend=False)
         plt.title('Распределение тональности', fontsize=12)
         plt.xlabel('Тональность', fontsize=10)
         plt.ylabel('Количество', fontsize=10)

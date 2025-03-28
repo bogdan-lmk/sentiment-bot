@@ -5,7 +5,7 @@ from pathlib import Path
 from src.reporting.base_reporter import BaseReporter
 
 # Path to Unicode font that supports Cyrillic
-FONT_DIR = os.path.join(os.path.dirname(__file__), "..", "fonts")
+FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "fonts")
 FONT_PATH = os.path.join(FONT_DIR, "DejaVuSans.ttf")
 FONT_URL = "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip"
 

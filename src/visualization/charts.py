@@ -41,7 +41,7 @@ class DataVisualizer:
             sentiment_counts = self.data['category'].value_counts()
             
             fig = self._create_figure(figsize=(8, 6))
-            sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, palette='viridis')
+            sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, hue=sentiment_counts.index, palette='viridis', legend=False)
             
             plt.title('Распределение тональности сообщений', fontsize=14, fontweight='bold')
             plt.xlabel('Категория тональности', fontsize=10)
@@ -69,7 +69,7 @@ class DataVisualizer:
             top_keywords = keywords_df.head(top_n)
             
             fig = self._create_figure(figsize=(10, 6))
-            sns.barplot(x='count', y='keyword', data=top_keywords, palette='Blues_d')
+            sns.barplot(x='count', y='keyword', data=top_keywords, hue='keyword', palette='Blues_d', legend=False)
             
             plt.title(f'Top {top_n} часто упоминаемых ключевых слов', fontsize=14, fontweight='bold')
             plt.xlabel('Частота', fontsize=10)
@@ -98,12 +98,12 @@ class DataVisualizer:
                 raise ValueError("trend_data должен быть pandas DataFrame")
             
             # Проверка колонок для линейного графика
-            required_columns = ['date', 'value']
+            required_columns = ['date', '0']
             for col in required_columns:
                 if col not in trend_data.columns:
                     raise ValueError(f"Отсутствует обязательная колонка: {col}")
             
-            sns.lineplot(x='date', y='value', data=trend_data, palette='coolwarm', linewidth=2)
+            sns.lineplot(x='date', y='0', data=trend_data, color='#1f77b4', linewidth=2)
             
             plt.title('Тренды сообщений по времени', fontsize=14, fontweight='bold')
             plt.xlabel('Дата', fontsize=10)
@@ -132,9 +132,11 @@ class DataVisualizer:
             
             # Проверка обязательных колонок
             required_columns = ['x', 'y', 'cluster']
-            for col in required_columns:
-                if col not in df.columns:
-                    raise ValueError(f"Отсутствует обязательная колонка: {col}")
+            missing_cols = [col for col in required_columns if col not in df.columns]
+            if missing_cols:
+                plt.text(0.5, 0.5, 'Данные для кластеризации недоступны', 
+                         horizontalalignment='center', verticalalignment='center')
+                return fig
             
             sns.scatterplot(data=df, x='x', y='y', hue='cluster', 
                             palette='deep', s=100, alpha=0.7)

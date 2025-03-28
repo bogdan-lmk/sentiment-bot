@@ -75,6 +75,42 @@ def start_reporting():
             logger.error("Processed data files not found in data/processed/")
             return
 
+        # Create visualizations directory if it doesn't exist
+        os.makedirs("reports/visualizations", exist_ok=True)
+
+        # Generate visualizations
+        from src.visualization.charts import DataVisualizer
+        import pandas as pd
+        
+        # Load data for visualizations
+        sentiment_df = pd.read_csv("data/processed/sentiment_analysis.csv")
+        keywords_df = pd.read_csv("data/processed/keywords.csv")
+        trends_df = pd.read_csv("data/processed/message_trends.csv")
+        clusters_df = pd.read_csv("data/processed/message_clusters.csv")
+
+        # Create and save visualizations
+        visualizer = DataVisualizer(sentiment_df)
+        
+        # Sentiment distribution
+        fig = visualizer.plot_sentiment_distribution()
+        fig.savefig("reports/visualizations/sentiment_distribution.png")
+        plt.close(fig)
+        
+        # Top keywords
+        fig = visualizer.plot_top_keywords(keywords_df)
+        fig.savefig("reports/visualizations/top_keywords.png")
+        plt.close(fig)
+        
+        # Message trends
+        fig = visualizer.plot_trends(trends_df)
+        fig.savefig("reports/visualizations/message_trends.png")
+        plt.close(fig)
+        
+        # Message clusters
+        fig = visualizer.plot_clusters(clusters_df)
+        fig.savefig("reports/visualizations/message_clusters.png")
+        plt.close(fig)
+
         # Initialize reporters
         llm_report = LLMReporter(input_data_path="data/processed", provider="deepseek")
         pdf_report = PDFReporter(input_data_path="data/processed")
@@ -91,7 +127,7 @@ def start_reporting():
             if short_report_text:
                 pdf_report.generate_short_report(short_report_text)
             
-            logger.info("All reports generated successfully.")
+            logger.info("All reports and visualizations generated successfully.")
         else:
             logger.error("Failed to generate LLM report text")
     except Exception as e:
