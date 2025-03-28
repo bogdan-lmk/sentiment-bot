@@ -26,6 +26,7 @@ COPY .env .
 
 # Ensure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
 
 # Clean up
 RUN find /app -type d -name "__pycache__" -exec rm -rf {} + && \
