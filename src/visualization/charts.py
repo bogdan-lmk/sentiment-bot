@@ -35,9 +35,13 @@ class DataVisualizer:
         """
         Создает график распределения тональности сообщений.
         
-        :return: Фигура matplotlib с графиком распределения
+        :return: Фигура matplotlib с графиком распределения или None если данные отсутствуют
         """
         try:
+            if 'category' not in self.data.columns:
+                print("Пропуск графика тональности - столбец 'category' отсутствует")
+                return None
+                
             sentiment_counts = self.data['category'].value_counts()
             
             # Convert index to string to ensure categorical plotting
@@ -55,11 +59,8 @@ class DataVisualizer:
             
             return fig
         except Exception as e:
-            print(f"Ошибка вplot_sentiment_distribution: {e}")
-            fig = self._create_figure()
-            plt.text(0.5, 0.5, f'Ошибка визуализации: {e}', 
-                     horizontalalignment='center', verticalalignment='center')
-            return fig
+            print(f"Ошибка в plot_sentiment_distribution: {e}")
+            return None
 
     def plot_top_keywords(self, keywords_df, top_n=10):
         """
@@ -133,19 +134,17 @@ class DataVisualizer:
         
         :param df: DataFrame с координатами и кластерами
         :param n_clusters: Количество кластеров
-        :return: Фигура matplotlib с графиком кластеров
+        :return: Фигура matplotlib с графиком кластеров или None если данные отсутствуют
         """
         try:
-            fig = self._create_figure(figsize=(8, 6))
-            
             # Проверка обязательных колонок
             required_columns = ['x', 'y', 'cluster']
             missing_cols = [col for col in required_columns if col not in df.columns]
             if missing_cols:
-                plt.text(0.5, 0.5, 'Данные для кластеризации недоступны', 
-                         horizontalalignment='center', verticalalignment='center')
-                return fig
+                print(f"Пропуск графика кластеров - отсутствуют колонки: {missing_cols}")
+                return None
             
+            fig = self._create_figure(figsize=(8, 6))
             sns.scatterplot(data=df, x='x', y='y', hue='cluster', 
                             palette='deep', s=100, alpha=0.7)
             
@@ -158,10 +157,7 @@ class DataVisualizer:
             return fig
         except Exception as e:
             print(f"Ошибка в plot_clusters: {e}")
-            fig = self._create_figure()
-            plt.text(0.5, 0.5, f'Ошибка визуализации: {e}', 
-                     horizontalalignment='center', verticalalignment='center')
-            return fig
+            return None
 
     def plot_sentiment_by_time(self, sentiment_data):
         """

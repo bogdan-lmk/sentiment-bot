@@ -5,6 +5,8 @@ import os
 import logging
 import asyncio
 import matplotlib.pyplot as plt
+import schedule
+import time
 from config.telegram_config import TELEGRAM_BOT_TOKEN, TELEGRAM_REPORT_CHAT_ID
 from src.bot.bot import TelegramBot
 from src.analyzer.keyword_extractor import AdvancedNLPAnalyzer
@@ -92,25 +94,26 @@ def start_reporting():
         # Create and save visualizations
         visualizer = DataVisualizer(sentiment_df)
         
-        # Sentiment distribution
+        # Generate and save charts only if they return a figure
         fig = visualizer.plot_sentiment_distribution()
-        fig.savefig("reports/visualizations/sentiment_distribution.png")
-        plt.close(fig)
+        if fig is not None:
+            fig.savefig("reports/visualizations/sentiment_distribution.png")
+            plt.close(fig)
         
-        # Top keywords
         fig = visualizer.plot_top_keywords(keywords_df)
-        fig.savefig("reports/visualizations/top_keywords.png")
-        plt.close(fig)
+        if fig is not None:
+            fig.savefig("reports/visualizations/top_keywords.png")
+            plt.close(fig)
         
-        # Message trends
         fig = visualizer.plot_trends(trends_df)
-        fig.savefig("reports/visualizations/message_trends.png")
-        plt.close(fig)
+        if fig is not None:
+            fig.savefig("reports/visualizations/message_trends.png")
+            plt.close(fig)
         
-        # Message clusters
         fig = visualizer.plot_clusters(clusters_df)
-        fig.savefig("reports/visualizations/message_clusters.png")
-        plt.close(fig)
+        if fig is not None:
+            fig.savefig("reports/visualizations/message_clusters.png")
+            plt.close(fig)
 
         # Initialize reporters
         llm_report = LLMReporter(input_data_path="data/processed", provider="deepseek")
@@ -146,12 +149,10 @@ def start_dashboard():
         logger.error(f"Error starting the dashboard: {e}")
         return None
 
-async def main():
-    """Main function to start the services."""
-    logger.info("Starting the main application...")
-    dashboard_thread = None
-
+async def process_data():
+    """Process data pipeline - parse messages, analyze, and generate reports."""
     try:
+        logger.info("Starting scheduled data processing...")
         # First parse messages from Telegram
         success = await parse_telegram_messages()
         if not success:
@@ -166,22 +167,40 @@ async def main():
 
         # Start dashboard if data exists
         if os.path.exists('data/processed/sentiment_analysis.csv'):
-            dashboard_thread = start_dashboard()
+            start_dashboard()
         else:
             logger.error("Cannot start dashboard - sentiment analysis data not found")
+    except Exception as e:
+        logger.error(f"Error in data processing: {e}")
 
+async def main():
+    """Main function to start the services."""
+    logger.info("Starting the main application...")
+
+    # Schedule data processing every 6 hours
+    schedule.every(6).hours.do(lambda: asyncio.run(process_data()))
+
+    # Run initial processing
+    await process_data()
+
+    # Start scheduler in background
+    def run_scheduler():
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+
+    scheduler_thread = threading.Thread(target=run_scheduler)
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
+
+    try:
         # Run Telegram bot (this will block until stopped)
         await run_telegram_bot()
-
     except KeyboardInterrupt:
         logger.info("Application stopped by user")
     except Exception as e:
         logger.error(f"Fatal error in application: {e}")
         raise
-    finally:
-        if dashboard_thread and dashboard_thread.is_alive():
-            logger.info("Stopping dashboard...")
-            os.kill(os.getpid(), signal.SIGTERM)
 
 if __name__ == '__main__':
     asyncio.run(main())
