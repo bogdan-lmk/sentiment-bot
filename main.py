@@ -1,6 +1,4 @@
 # Must precede any llm module imports
-
-
 import os
 import logging
 import asyncio
@@ -39,12 +37,14 @@ async def parse_telegram_messages():
         logger.info("Parsing Telegram messages...")
         from src.data_collector.telegram_parser import TelegramParser
         parser = TelegramParser()
-        success = await parser.parse_messages(output_path="data/raw/messages.csv")
+        success = await parser.run()
         if not success:
             logger.error("Failed to parse messages - no messages found")
             return False
-        if not os.path.exists("data/raw/messages.csv"):
-            logger.error("Messages file not created")
+        # Check if any geo message files were created
+        geo_dirs = [d for d in os.listdir("data/raw") if os.path.isdir(os.path.join("data/raw", d))]
+        if not any(os.path.exists(f"data/raw/{geo}/messages_{geo}.csv") for geo in geo_dirs):
+            logger.error("No message files found in data/raw/* directories")
             return False
         logger.info("Message parsing completed successfully.")
         return True
@@ -56,8 +56,27 @@ def start_nlp_analysis():
     """Initialize and start the NLP analysis."""
     try:
         logger.info("Starting the NLP analysis...")
-        analyzer = AdvancedNLPAnalyzer(language='russian')
-        analyzer.comprehensive_analysis(input_path="data/raw/messages.csv", output_dir="data/processed")
+        from config.analyzer_config import ANALYZER_CONFIG
+        
+        # Get geo codes from raw data directories
+        geo_dirs = [d for d in os.listdir("data/raw") 
+                   if os.path.isdir(os.path.join("data/raw", d))]
+        
+        if not geo_dirs:
+            logger.error("No geo directories found in data/raw/")
+            return
+
+        analyzer = AdvancedNLPAnalyzer(language=ANALYZER_CONFIG["default_language"])
+        
+        # Process each geo region
+        for geo_code in geo_dirs:
+            logger.info(f"Processing geo region: {geo_code}")
+            analyzer.comprehensive_analysis(
+                geo_code=geo_code,
+                input_dir=ANALYZER_CONFIG["input_dir"],
+                output_dir=ANALYZER_CONFIG["output_dir"]
+            )
+        
         logger.info("NLP analysis completed successfully.")
     except Exception as e:
         logger.error(f"Error starting the NLP analysis: {e}")
@@ -67,12 +86,19 @@ def start_reporting():
     try:
         logger.info("Starting report generation...")
         
+        # Check for processed files in geo directories
+        geo_dirs = [d for d in os.listdir("data/processed") if os.path.isdir(os.path.join("data/processed", d))]
+        if not geo_dirs:
+            logger.error("No processed geo directories found in data/processed/")
+            return
+
         # Wait for NLP analysis to complete by checking for any output files
         processed_files = [
             "keywords.csv",
             "message_clusters.csv", 
             "sentiment_analysis.csv",
-            "theme_classification.csv"
+            "theme_classification.csv",
+            "top_phrases.csv"
         ]
         if not any(os.path.exists(f"data/processed/{f}") for f in processed_files):
             logger.error("Processed data files not found in data/processed/")
@@ -85,55 +111,73 @@ def start_reporting():
         from src.visualization.charts import DataVisualizer
         import pandas as pd
         
-        # Load data for visualizations
-        sentiment_df = pd.read_csv("data/processed/sentiment_analysis.csv")
-        keywords_df = pd.read_csv("data/processed/keywords.csv")
-        trends_df = pd.read_csv("data/processed/message_trends.csv")
-        clusters_df = pd.read_csv("data/processed/message_clusters.csv")
+        # Process visualizations per geo
+        geo_dirs = [d for d in os.listdir("data/processed") if os.path.isdir(os.path.join("data/processed", d))]
+        
+        for geo in geo_dirs:
+            geo_path = os.path.join("data/processed", geo)
+            vis_path = os.path.join("reports/visualizations", geo)
+            os.makedirs(vis_path, exist_ok=True)
 
-        # Create and save visualizations
-        visualizer = DataVisualizer(sentiment_df)
-        
-        # Generate and save charts only if they return a figure
-        fig = visualizer.plot_sentiment_distribution()
-        if fig is not None:
-            fig.savefig("reports/visualizations/sentiment_distribution.png")
-            plt.close(fig)
-        
-        fig = visualizer.plot_top_keywords(keywords_df)
-        if fig is not None:
-            fig.savefig("reports/visualizations/top_keywords.png")
-            plt.close(fig)
-        
-        fig = visualizer.plot_trends(trends_df)
-        if fig is not None:
-            fig.savefig("reports/visualizations/message_trends.png")
-            plt.close(fig)
-        
-        fig = visualizer.plot_clusters(clusters_df)
-        if fig is not None:
-            fig.savefig("reports/visualizations/message_clusters.png")
-            plt.close(fig)
+            try:
+                # Load geo-specific data
+                sentiment_df = pd.read_csv(f"{geo_path}/sentiment_analysis_{geo}.csv")
+                keywords_df = pd.read_csv(f"{geo_path}/keywords_{geo}.csv")
+                trends_df = pd.read_csv(f"{geo_path}/message_trends_{geo}.csv")
+                clusters_df = pd.read_csv(f"{geo_path}/message_clusters_{geo}.csv")
+                phrases_df = pd.read_csv(f"{geo_path}/top_phrases_{geo}.csv")
 
-        # Initialize reporters
-        llm_report = LLMReporter(input_data_path="data/processed", provider="deepseek")
-        pdf_report = PDFReporter(input_data_path="data/processed")
-        csv_report = CSVReporter(input_data_path="data/processed")
+                visualizer = DataVisualizer(sentiment_df)
+                
+                fig = visualizer.plot_sentiment_distribution()
+                if fig is not None:
+                    fig.savefig(f"{vis_path}/sentiment_distribution.png")
+                    plt.close(fig)
+                
+                fig = visualizer.plot_top_keywords(keywords_df)
+                if fig is not None:
+                    fig.savefig(f"{vis_path}/top_keywords.png")
+                    plt.close(fig)
+                
+                fig = visualizer.plot_trends(trends_df)
+                if fig is not None:
+                    fig.savefig(f"{vis_path}/message_trends.png")
+                    plt.close(fig)
+                
+                fig = visualizer.plot_clusters(clusters_df)
+                if fig is not None:
+                    fig.savefig(f"{vis_path}/message_clusters.png")
+                    plt.close(fig)
+                
+                fig = visualizer.plot_top_phrases(phrases_df)
+                if fig is not None:
+                    fig.savefig(f"{vis_path}/top_phrases.png")
+                    plt.close(fig)
 
-        # Generate full reports
-        report_text = llm_report.generate_report()
-        if report_text:
-            pdf_report.generate_report(report_text)
-            csv_report.generate_report()
+            except Exception as e:
+                logger.error(f"Error processing visualizations for {geo}: {e}")
+
+        # Generate reports per geo
+        for geo in geo_dirs:
+            geo_path = os.path.join("data/processed", geo)
             
-            # Generate short reports
-            short_report_text = llm_report.generate_short_report()
-            if short_report_text:
-                pdf_report.generate_short_report(short_report_text)
+            # Initialize reporters with geo-specific data
+            llm_report = LLMReporter(input_data_path=geo_path, provider="deepseek")
+            pdf_report = PDFReporter(input_data_path=geo_path)
+            csv_report = CSVReporter(input_data_path=geo_path)
+
+            # Generate full reports
+            report_text = llm_report.generate_report()
+            if report_text:
+                pdf_report.generate_report(report_text)
+                csv_report.generate_report()
+                
+                # Generate short reports
+                short_report_text = llm_report.generate_short_report()
+                if short_report_text:
+                    pdf_report.generate_short_report(short_report_text)
             
             logger.info("All reports and visualizations generated successfully.")
-        else:
-            logger.error("Failed to generate LLM report text")
     except Exception as e:
         logger.error(f"Error generating reports: {e}")
 
@@ -166,7 +210,7 @@ async def process_data():
         start_reporting()
 
         # Start dashboard if data exists
-        if os.path.exists('data/processed/sentiment_analysis.csv'):
+        if any(f.endswith('sentiment_analysis.csv') for f in os.listdir('data/processed')):
             start_dashboard()
         else:
             logger.error("Cannot start dashboard - sentiment analysis data not found")

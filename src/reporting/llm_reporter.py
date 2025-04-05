@@ -1,6 +1,11 @@
 import os
 import pandas as pd
 from collections import Counter
+import sys
+import os
+
+
+
 from src.reporting.base_reporter import BaseReporter
 from dotenv import load_dotenv
 import re
@@ -17,13 +22,16 @@ class LLMReporter(BaseReporter):
     """
 
     def __init__(
-        self, 
-        input_data_path="data/processed", 
+        self,
+        input_data_path="data/processed",
+        output_dir="reports",
         provider="deepseek",  # Default to DeepSeek with OpenAI as fallback
-        model="deepseek-reasoner", 
-        max_tokens=4000
+        model="deepseek-reasoner",
+        max_tokens=4000,
+        active_geo: Optional[str] = None
     ):
-        super().__init__(input_data_path=input_data_path)
+        super().__init__(input_data_path=input_data_path, output_dir=output_dir)
+        self.active_geo = active_geo
         self.model = model
         self.max_tokens = max_tokens
         
@@ -97,11 +105,11 @@ class LLMReporter(BaseReporter):
 
     def generate_report(self):
         """
-        Создаеn информативный детальный отчет с помощью LLM с расширенными возможностями.
+        Создаем информативный детальный отчет с помощью LLM с расширенными возможностями.
         """
         try:
             # Проверка на наличие файла перед загрузкой
-            messages_file_path = os.path.join("data/raw", "messages.csv")
+            messages_file_path = os.path.join(self.input_data_path, self.active_geo, "processed_messages.csv")
             if not os.path.exists(messages_file_path):
                 print(f"Файл {messages_file_path} не найден.")
                 return "No messages data found"
@@ -116,7 +124,7 @@ class LLMReporter(BaseReporter):
 
             # Загружаем данные анализа тональности, если доступны
             sentiment_stats = {}
-            sentiment_path = os.path.join("data/processed", "sentiment_analysis.csv")
+            sentiment_path = os.path.join(self.input_data_path, self.active_geo, "sentiment_analysis.csv")
             if os.path.exists(sentiment_path):
                 sentiment_df = pd.read_csv(sentiment_path)
                 sentiment_stats = {
@@ -125,6 +133,13 @@ class LLMReporter(BaseReporter):
                     'neutral': len(sentiment_df[sentiment_df['category'] == 'нейтрально']),
                     'total': len(sentiment_df)
                 }
+
+            # Загружаем топ фраз, если доступны
+            phrases_stats = []
+            phrases_path = os.path.join(self.input_data_path, self.active_geo, "top_phrases.csv")
+            if os.path.exists(phrases_path):
+                phrases_df = pd.read_csv(phrases_path)
+                phrases_stats = phrases_df.to_dict('records')
 
             # Предварительная обработка сообщений
             message_stats = self._preprocess_messages(messages)
@@ -143,6 +158,9 @@ class LLMReporter(BaseReporter):
             Наиболее частые сообщения:
             {chr(10).join([f"{msg} (встречается {count} раз)" for msg, count in message_stats['most_common_messages']])}
 
+            Наиболее частые фразы (2-4 слова):
+            {chr(10).join([f"{p['phrase']} (встречается {p['count']} раз)" for p in phrases_stats[:20]]) if phrases_stats else "Данные о фразах недоступны"}
+
             Географический срез:
             {chr(10).join([f"{location}: {count} упоминаний" for location, count in message_stats['geography'].items()])}
 
@@ -158,8 +176,8 @@ class LLMReporter(BaseReporter):
             Используй простой текстовый формат без использования символов форматирования (например, ##, **, ---) и других специальных знаков.
             Если предоставленная информация неполная или требует уточнения, задай дополнительные вопросы для получения более детальной информации, чтобы улучшить качество анализа.
 
-            Для анализа используй первые 500 сообщений:
-            {chr(10).join(messages[:500])}
+            Для анализа используй первые 250 сообщений:
+            {chr(10).join(messages[:250])}
             """
 
             # Generate report using the selected provider
@@ -173,13 +191,24 @@ class LLMReporter(BaseReporter):
             if not report_content:
                 return "LLM report unavailable - generation failed"
 
-            # Сохранение отчета
-            self.save_report(report_content, "ai_report.txt")
+            # Ensure report directory exists and save with consistent name
+            if not self.active_geo:
+                raise ValueError("Active geo region is not set")
+            
+            report_dir = os.path.join("reports", self.active_geo, "llm_reports")
+            os.makedirs(report_dir, exist_ok=True)
+            report_path = os.path.join(report_dir, "detailed_report.txt")
+            self.save_report(report_content, report_path)
+            print(f"Saved LLM report to: {report_path}")
             print("Детальный отчет GPT успешно создан.")
 
             # Генерация PDF версии
             from src.reporting.pdf_reporter import PDFReporter
-            pdf_reporter = PDFReporter()
+            pdf_reporter = PDFReporter(
+                input_data_path=os.path.join(self.input_data_path, self.active_geo, "llm_reports"),
+                output_dir=os.path.join(self.output_dir, self.active_geo),
+                active_geo=self.active_geo
+            )
             pdf_reporter.generate_report(report_content)
             print("PDF версия отчета создана.")
 
@@ -195,7 +224,7 @@ class LLMReporter(BaseReporter):
         """
         try:
             # Проверка на наличие файла перед загрузкой
-            messages_file_path = os.path.join("data/raw", "messages.csv")
+            messages_file_path = os.path.join(self.input_data_path, self.active_geo, "processed_messages.csv")
             if not os.path.exists(messages_file_path):
                 print(f"Файл {messages_file_path} не найден.")
                 return "No messages data found"
@@ -210,7 +239,7 @@ class LLMReporter(BaseReporter):
 
             # Загружаем данные анализа тональности, если доступны
             sentiment_stats = {}
-            sentiment_path = os.path.join("data/processed", "sentiment_analysis.csv")
+            sentiment_path = os.path.join(self.input_data_path, self.active_geo, "sentiment_analysis.csv")
             if os.path.exists(sentiment_path):
                 sentiment_df = pd.read_csv(sentiment_path)
                 sentiment_stats = {
@@ -220,6 +249,13 @@ class LLMReporter(BaseReporter):
                     'total': len(sentiment_df)
                 }
 
+            # Загружаем топ фраз, если доступны
+            phrases_stats = []
+            phrases_path = os.path.join(self.input_data_path, self.active_geo, "top_phrases.csv")
+            if os.path.exists(phrases_path):
+                phrases_df = pd.read_csv(phrases_path)
+                phrases_stats = phrases_df.to_dict('records')
+
             # Формирование краткого промпта
             prompt = f"""
             Создай информативный  аналитический отчет  со следующими ключевыми выводами:
@@ -228,8 +264,10 @@ class LLMReporter(BaseReporter):
             - Общее количество сообщений: {len(messages)}
             {f"- Позитивных сообщений: {sentiment_stats.get('positive', 'N/A')}" if sentiment_stats else ""}
             {f"- Негативных сообщений: {sentiment_stats.get('negative', 'N/A')}" if sentiment_stats else ""}
+            {f"- Топ фраз: {chr(10).join([f'{p["phrase"]} ({p["count"]})' for p in phrases_stats[:5]])}" if phrases_stats else ""}
 
             Требования к анализу:
+            Используй простой текстовый формат без использования символов форматирования (например, ##, **, ---) и других специальных знаков.
             Remove markdown formatting (##, **, ---)
             Remove markdown formatting ( **word**)
             1. Выдели  ключевые темы
@@ -258,7 +296,7 @@ class LLMReporter(BaseReporter):
 
             # Сохранение отчета
             try:
-                self.save_report(report_content, "short_llm_report.txt")
+                self.save_report(report_content, f"short_llm_report_{self.active_geo}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
                 print("Краткий отчет успешно создан.")
             except Exception as e:
                 print(f"Ошибка сохранения текстового отчета: {e}")
@@ -267,7 +305,11 @@ class LLMReporter(BaseReporter):
             # Генерация PDF версии
             try:
                 from src.reporting.pdf_reporter import PDFReporter
-                pdf_reporter = PDFReporter()
+                pdf_reporter = PDFReporter(
+                    input_data_path=os.path.join(self.input_data_path, self.active_geo, "llm_reports"),
+                    output_dir=os.path.join(self.output_dir, self.active_geo),
+                    active_geo=self.active_geo
+                )
                 pdf_reporter.generate_short_report(report_content)
                 print("PDF версия краткого отчета создана.")
             except Exception as e:

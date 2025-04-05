@@ -141,12 +141,22 @@ class AdvancedNLPAnalyzer:
         """Многоязычный анализ тональности."""
         sentiments = []
         for message in messages:
-            result = self.sentiment_analyzer(message)[0]
-            sentiments.append({
-                'text': message,
-                'sentiment': result['label'],
-                'score': result['score']
-            })
+            try:
+                # Truncate messages longer than 500 characters to avoid model errors
+                truncated_msg = message[:500] if len(message) > 500 else message
+                result = self.sentiment_analyzer(truncated_msg)[0]
+                sentiments.append({
+                    'text': message,
+                    'sentiment': result['label'],
+                    'score': result['score']
+                })
+            except Exception as e:
+                self.logger.warning(f"Failed to analyze sentiment for message: {e}")
+                sentiments.append({
+                    'text': message,
+                    'sentiment': 'neutral',
+                    'score': 0.5
+                })
         return sentiments
 
     def theme_classification(self, messages: List[str]) -> List[Dict[str, Any]]:
@@ -210,6 +220,50 @@ class AdvancedNLPAnalyzer:
         trend_data = df.resample(f'{window_days}D', on=time_column).size()
         return trend_data
 
+    def keyword_extractor(self, texts: List[str], top_n: int = 10, min_count: int = 2) -> List[Tuple[str, int]]:
+        """Извлекает наиболее часто упоминаемые фразы из текстов.
+        
+        Args:
+            texts: Список текстов для анализа
+            top_n: Количество возвращаемых топ фраз
+            min_count: Минимальное количество упоминаний фразы
+            
+        Returns:
+            Список кортежей (фраза, количество) отсортированный по частоте
+        """
+        # Фразы для исключения
+        EXCLUDED_PHRASES = {
+            'доброго дня', 'добрый день', 'доброго вечора', 
+            'підкажіть ласка', 'можливо хтось', 'хтось знає',
+            'добрий день', 'здравствуйте подскажите', 'добрый вечер',
+            'може хтось', 'дуже вдячний', 'размещения рекламы',
+            'рекламы пишите', 'размещения рекламы пишите'
+        }
+
+        # Собираем все тексты в один
+        combined_text = ' '.join(text for text in texts if isinstance(text, str))
+        
+        # Обрабатываем текст
+        processed_tokens = self.preprocess_text(combined_text)
+        
+        # Генерируем n-граммы (2-4 слова)
+        ngrams = []
+        for n in range(2, 5):
+            ngrams.extend([' '.join(processed_tokens[i:i+n]) 
+                         for i in range(len(processed_tokens)-n+1)])
+        
+        # Считаем частоту фраз, исключая нежелательные
+        phrase_counts = {}
+        for phrase in ngrams:
+            if phrase.lower() not in EXCLUDED_PHRASES:
+                phrase_counts[phrase] = phrase_counts.get(phrase, 0) + 1
+        
+        # Фильтруем по минимальному количеству и сортируем
+        filtered_phrases = [(p, c) for p, c in phrase_counts.items() if c >= min_count]
+        sorted_phrases = sorted(filtered_phrases, key=lambda x: x[1], reverse=True)
+        
+        return sorted_phrases[:top_n]
+
     def generate_visualizations(self, df: pd.DataFrame, output_dir: str):
         """Создание визуализаций."""
         os.makedirs(output_dir, exist_ok=True)
@@ -240,10 +294,15 @@ class AdvancedNLPAnalyzer:
             fig_sentiment.write_html(f'{output_dir}/sentiment_trends.html')
 
     def comprehensive_analysis(
-        self, 
-        input_path: str = "data/raw/messages.csv", 
-        output_dir: str = "data/processed"
+        self,
+        geo_code: str,
+        input_path: str = None,
+        output_dir: str = None,
+        input_dir: str = None  # Add this parameter to match main.py's call
     ):
+        """Полный NLP-анализ для конкретного гео-региона."""
+        input_path = input_path or f"data/raw/{geo_code}/messages_{geo_code}.csv"
+        output_dir = output_dir or f"data/processed/{geo_code}"
         """Полный NLP-анализ."""
         os.makedirs(output_dir, exist_ok=True)
         
@@ -253,22 +312,38 @@ class AdvancedNLPAnalyzer:
         
         self.logger.info("Начало комплексного NLP-анализа")
         
-        # 1. Ключевые слова
+        # 1. Ключевые слова и фразы
+        # Одиночные ключевые слова
         keywords = pd.DataFrame(
             self.preprocess_text(' '.join(messages)), 
             columns=['keyword']
         ).value_counts().reset_index(name='count')
         keywords.to_csv(f'{output_dir}/keywords.csv', index=False, encoding='utf-8')
         
-        # 2. Анализ тональности (опционально)
-        if 'sentiment' not in df.columns:
-            self.logger.info("Пропуск анализа тональности - столбец sentiment отсутствует")
+        # Частые фразы (2-4 слова)
+        phrases = self.keyword_extractor(messages, top_n=50, min_count=3)
+        if phrases:  # Only create file if we have phrases
+            phrases_df = pd.DataFrame(phrases, columns=['phrase', 'count'])
+            phrases_df.to_csv(
+                f'{output_dir}/top_phrases.csv', 
+                index=False, 
+                encoding='utf-8'
+            )
+            print(f"Saved top phrases to {output_dir}/top_phrases.csv")
         else:
-            sentiments = self.sentiment_analysis(messages)
-            sentiment_df = pd.DataFrame(sentiments)
-            if 'date' in df.columns:
-                sentiment_df['date'] = df['date'].iloc[:len(sentiment_df)]
-            sentiment_df.to_csv(f'{output_dir}/sentiment_analysis.csv', index=False, encoding='utf-8')
+            print("No phrases found to save")
+        
+        # 2. Анализ тональности (всегда выполняем)
+        sentiments = self.sentiment_analysis(messages)
+        sentiment_df = pd.DataFrame(sentiments)
+        if 'date' in df.columns:
+            sentiment_df['date'] = df['date'].iloc[:len(sentiment_df)]
+        sentiment_df.to_csv(f'{output_dir}/sentiment_analysis.csv', index=False, encoding='utf-8')
+        
+        # Сохраняем обработанные сообщения
+        processed_df = df[['date', 'text']].copy()
+        processed_df['processed_text'] = [' '.join(self.preprocess_text(t)) for t in processed_df['text']]
+        processed_df.to_csv(f'{output_dir}/processed_messages.csv', index=False, encoding='utf-8')
         
         # 3. Классификация тем
         themes = self.theme_classification(messages)
@@ -295,8 +370,33 @@ class AdvancedNLPAnalyzer:
         # 7. Визуализации
         if 'theme' in df.columns:
             self.generate_visualizations(df, output_dir)
-        else:
-            self.logger.warning("Cannot generate visualizations - theme column not available")
+            
+        # Генерация визуализаций для фраз
+        try:
+            if os.path.exists(f'{output_dir}/top_phrases.csv'):
+                phrases_df = pd.read_csv(f'{output_dir}/top_phrases.csv')
+                if not phrases_df.empty:
+                    # Create HTML visualization
+                    fig = px.bar(
+                        phrases_df.head(20),
+                        x='count',
+                        y='phrase',
+                        orientation='h',
+                        title='Top 20 Most Frequent Phrases'
+                    )
+                    fig.write_html(f'{output_dir}/top_phrases.html')
+                    
+                    # Create PNG image
+                    fig = px.bar(
+                        phrases_df.head(20),
+                        x='count',
+                        y='phrase',
+                        orientation='h',
+                        title='Top 20 Most Frequent Phrases'
+                    )
+                    fig.write_image(f'{output_dir}/top_phrases.png')
+        except Exception as e:
+            self.logger.error(f"Error generating phrase visualizations: {e}")
         
         self.logger.info("Комплексный NLP-анализ завершен")
 

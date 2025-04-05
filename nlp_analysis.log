@@ -10,3 +10,19 @@
 2025-03-27 14:48:33,254 - INFO: Начало комплексного NLP-анализа
 2025-03-27 14:48:34,387 - INFO: Пропуск анализа тональности - столбец sentiment отсутствует
 2025-03-27 14:48:34,979 - INFO: Комплексный NLP-анализ завершен
+2025-04-05 22:57:46,999 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_ru/data
+2025-04-05 22:57:47,034 - INFO: format: 2.4, revision: 417150, updated: 2022-01-08T22:09:24.565962
+2025-04-05 22:57:47,884 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_uk/data
+2025-04-05 22:57:47,912 - INFO: format: 2.4, revision: 1, updated: 2022-09-13T18:45:24.998984
+2025-04-05 22:57:51,703 - INFO: Начало комплексного NLP-анализа
+2025-04-05 22:59:19,660 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_ru/data
+2025-04-05 22:59:19,691 - INFO: format: 2.4, revision: 417150, updated: 2022-01-08T22:09:24.565962
+2025-04-05 22:59:20,404 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_uk/data
+2025-04-05 22:59:20,429 - INFO: format: 2.4, revision: 1, updated: 2022-09-13T18:45:24.998984
+2025-04-05 22:59:24,082 - INFO: Начало комплексного NLP-анализа
+2025-04-05 23:00:32,507 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_ru/data
+2025-04-05 23:00:32,535 - INFO: format: 2.4, revision: 417150, updated: 2022-01-08T22:09:24.565962
+2025-04-05 23:00:33,240 - INFO: Loading dictionaries from /Users/buyer7/Desktop/ai-santiment/venv/lib/python3.12/site-packages/pymorphy3_dicts_uk/data
+2025-04-05 23:00:33,261 - INFO: format: 2.4, revision: 1, updated: 2022-09-13T18:45:24.998984
+2025-04-05 23:00:37,434 - INFO: Начало комплексного NLP-анализа
+2025-04-05 23:01:40,305 - INFO: Комплексный NLP-анализ завершен
