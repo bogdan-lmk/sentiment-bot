@@ -424,7 +424,7 @@ class AdvancedNLPAnalyzer:
 def main():
     # Создание анализатора с поддержкой русского, украинского и английского языков
     analyzer = AdvancedNLPAnalyzer(language='russian, ukrainian, english')
-    analyzer.comprehensive_analysis()
+    analyzer.comprehensive_analysis(geo_code='DEU')
     # Раскомментируйте следующую строку для запуска ежедневного анализа
     # analyzer.schedule_daily_analysis()
 

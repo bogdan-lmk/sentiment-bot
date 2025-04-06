@@ -137,9 +137,26 @@ class TelegramBot:
 
     async def handle_geo_selection(self, callback: CallbackQuery):
         """Handle geo selection from inline buttons"""
-        geo_code = callback.data.replace("geo_", "")
-        self.active_geo = geo_code
-        await callback.message.answer(f"✅ Выбран регион: {geo_code}")
+        geo_code = callback.data.replace("geo_", "").upper()
+        
+        # Validate geo code format and existence
+        if len(geo_code) != 3 or not geo_code.isalpha() or geo_code == "--geo":
+            await callback.message.answer("❌ Неверный формат кода региона (должен быть 3 буквы)")
+            return
+            
+        if geo_code not in GEO_GROUPS:
+            await callback.message.answer(f"❌ Регион {geo_code} не настроен в системе")
+            return
+            
+        # Set active_geo only after all validations pass
+
+        await callback.message.answer(f"✅ Выбран регион: {geo_code} ({GEO_GROUPS[geo_code]['name']})")
+        # Final validation before setting active_geo
+        if geo_code in GEO_GROUPS:
+            self.active_geo = geo_code
+        else:
+            logger.error(f"Invalid geo_code after validation: {geo_code}")
+            await callback.message.answer("❌ Ошибка выбора региона")
         
         try:
             await callback.message.answer(f"⏳ Начинаем парсинг для региона {geo_code}...")
@@ -260,13 +277,19 @@ class TelegramBot:
             await callback.answer("⏳ Формируем полный PDF отчет...")
             
             if not self.active_geo:
-                await callback.message.answer("❌ Сначала выберите регион!")
+                await callback.message.answer("❌ Сначала выберите валидный регион!")
+                return
+
+            # Validate geo code format
+            if len(self.active_geo) != 3 or not self.active_geo.isalpha():
+                await callback.message.answer("❌ Неверный формат кода региона")
                 return
 
             from src.reporting.pdf_reporter import PDFReporter
             pdf_reporter = PDFReporter(
                 input_data_path=f"data/processed/{self.active_geo}",
-                output_dir=f"reports/{self.active_geo}"
+                output_dir=f"reports/{self.active_geo}",
+                active_geo=self.active_geo
             )
             
             report_path = pdf_reporter.generate_report()

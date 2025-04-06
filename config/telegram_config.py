@@ -15,16 +15,19 @@ API_HASH = get_required_env("TELEGRAM_API_HASH")
 # Гео-группы для анализа
 GEO_GROUPS = {
     "DEU": {
+        "name": "Germany",
         "chat_ids": [-1002158812012,-1001783625336],  # Converted to integers
         "keywords": ["germany", "deutschland", "берлин"],
         "timezone": "Europe/Berlin"
     },
     "ESP": {
+        "name": "Spain",
         "chat_ids": [-1001727866141,-1001713113247],
         "keywords": ["spain", "españa", "мадрид"],
         "timezone": "Europe/Madrid"
     },
     "PRT": {
+        "name": "Portugal",
         "chat_ids": [-1001342547202,-1002239405289,-1001590941393],
         "keywords": ["portugal", "португалия", "лиссабон"],
         "timezone": "Europe/Lisbon"

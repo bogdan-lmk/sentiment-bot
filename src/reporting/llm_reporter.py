@@ -1,11 +1,8 @@
 import os
 import pandas as pd
 from collections import Counter
-import sys
-import os
-
-
-
+from datetime import datetime
+import logging
 from src.reporting.base_reporter import BaseReporter
 from dotenv import load_dotenv
 import re
@@ -30,7 +27,17 @@ class LLMReporter(BaseReporter):
         max_tokens=4000,
         active_geo: Optional[str] = None
     ):
+        # Validate active_geo
+        if active_geo == "--geo":
+            raise ValueError("Invalid geo code: '--geo' is not allowed")
+            
+        # Initialize with base paths
         super().__init__(input_data_path=input_data_path, output_dir=output_dir)
+        
+        # Set base output directory
+        self.output_dir = os.path.abspath(output_dir)
+        
+        # Set instance variables
         self.active_geo = active_geo
         self.model = model
         self.max_tokens = max_tokens
@@ -108,6 +115,12 @@ class LLMReporter(BaseReporter):
         Создаем информативный детальный отчет с помощью LLM с расширенными возможностями.
         """
         try:
+            # Validate active_geo is set and valid
+            if not self.active_geo:
+                error_msg = "Active geo region is not set"
+                print(error_msg)
+                return error_msg
+            
             # Проверка на наличие файла перед загрузкой
             messages_file_path = os.path.join(self.input_data_path, self.active_geo, "processed_messages.csv")
             if not os.path.exists(messages_file_path):
@@ -127,6 +140,12 @@ class LLMReporter(BaseReporter):
             sentiment_path = os.path.join(self.input_data_path, self.active_geo, "sentiment_analysis.csv")
             if os.path.exists(sentiment_path):
                 sentiment_df = pd.read_csv(sentiment_path)
+                # Convert sentiment scores to categories
+                sentiment_df['category'] = sentiment_df['sentiment'].apply(
+                    lambda x: 'позитив' if x in ['POSITIVE', 'positive', 4, 5] 
+                    else 'негатив' if x in ['NEGATIVE', 'negative', 1, 2] 
+                    else 'нейтрально'
+                )
                 sentiment_stats = {
                     'positive': len(sentiment_df[sentiment_df['category'] == 'позитив']),
                     'negative': len(sentiment_df[sentiment_df['category'] == 'негатив']),
@@ -191,26 +210,34 @@ class LLMReporter(BaseReporter):
             if not report_content:
                 return "LLM report unavailable - generation failed"
 
-            # Ensure report directory exists and save with consistent name
-            if not self.active_geo:
-                raise ValueError("Active geo region is not set")
-            
-            report_dir = os.path.join("reports", self.active_geo, "llm_reports")
+            # Create report directory structure
+            report_dir = os.path.join(self.output_dir, self.active_geo, "llm")
             os.makedirs(report_dir, exist_ok=True)
-            report_path = os.path.join(report_dir, "detailed_report.txt")
-            self.save_report(report_content, report_path)
+            
+            # Create report file
+            report_filename = "report.txt"
+            report_path = os.path.join(report_dir, report_filename)
+            
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(report_content)
             print(f"Saved LLM report to: {report_path}")
-            print("Детальный отчет GPT успешно создан.")
 
-            # Генерация PDF версии
-            from src.reporting.pdf_reporter import PDFReporter
-            pdf_reporter = PDFReporter(
-                input_data_path=os.path.join(self.input_data_path, self.active_geo, "llm_reports"),
-                output_dir=os.path.join(self.output_dir, self.active_geo),
-                active_geo=self.active_geo
-            )
-            pdf_reporter.generate_report(report_content)
-            print("PDF версия отчета создана.")
+            # Generate PDF version
+            try:
+                from src.reporting.pdf_reporter import PDFReporter
+                pdf_dir = os.path.join(self.output_dir, self.active_geo, "pdf")
+                os.makedirs(pdf_dir, exist_ok=True)
+                
+                pdf_reporter = PDFReporter(
+                    input_data_path=report_dir,
+                    output_dir=pdf_dir,
+                    active_geo=self.active_geo
+                )
+                pdf_reporter.generate_report(report_content)
+                print(f"PDF report saved to: {os.path.join(pdf_dir, 'report.pdf')}")
+            except Exception as e:
+                print(f"Ошибка при создании PDF: {e}")
+                # Continue even if PDF creation fails
 
             return report_content
 
@@ -223,13 +250,22 @@ class LLMReporter(BaseReporter):
         Создает аналитический отчет с ключевыми выводами.
         """
         try:
-            # Проверка на наличие файла перед загрузкой
+            # Validate active_geo is set and valid
+            if not self.active_geo:
+                error_msg = "Active geo region is not set"
+                print(error_msg)
+                return error_msg
+            if self.active_geo == "--geo":
+                raise ValueError("Invalid geo code: '--geo' is not allowed")
+
+            # Check for required data files
             messages_file_path = os.path.join(self.input_data_path, self.active_geo, "processed_messages.csv")
             if not os.path.exists(messages_file_path):
-                print(f"Файл {messages_file_path} не найден.")
-                return "No messages data found"
+                error_msg = f"Required data file not found: {messages_file_path}"
+                print(error_msg)
+                return error_msg
 
-            # Загружаем данные сообщений
+            # Load message data
             messages_df = pd.read_csv(messages_file_path)
             messages = messages_df["text"].dropna().tolist()
 
@@ -237,11 +273,16 @@ class LLMReporter(BaseReporter):
                 print("Нет данных для анализа.")
                 return "No messages to analyze"
 
-            # Загружаем данные анализа тональности, если доступны
+            # Load sentiment data if available
             sentiment_stats = {}
             sentiment_path = os.path.join(self.input_data_path, self.active_geo, "sentiment_analysis.csv")
             if os.path.exists(sentiment_path):
                 sentiment_df = pd.read_csv(sentiment_path)
+                sentiment_df['category'] = sentiment_df['sentiment'].apply(
+                    lambda x: 'позитив' if x in ['POSITIVE', 'positive', 4, 5] 
+                    else 'негатив' if x in ['NEGATIVE', 'negative', 1, 2] 
+                    else 'нейтрально'
+                )
                 sentiment_stats = {
                     'positive': len(sentiment_df[sentiment_df['category'] == 'позитив']),
                     'negative': len(sentiment_df[sentiment_df['category'] == 'негатив']),
@@ -249,30 +290,30 @@ class LLMReporter(BaseReporter):
                     'total': len(sentiment_df)
                 }
 
-            # Загружаем топ фраз, если доступны
+            # Load top phrases if available
             phrases_stats = []
             phrases_path = os.path.join(self.input_data_path, self.active_geo, "top_phrases.csv")
             if os.path.exists(phrases_path):
                 phrases_df = pd.read_csv(phrases_path)
                 phrases_stats = phrases_df.to_dict('records')
 
-            # Формирование краткого промпта
+            # Create short report prompt
             prompt = f"""
-            Создай информативный  аналитический отчет  со следующими ключевыми выводами:
+            Создай информативный аналитический отчет со следующими ключевыми выводами:
 
             Основные показатели:
             - Общее количество сообщений: {len(messages)}
             {f"- Позитивных сообщений: {sentiment_stats.get('positive', 'N/A')}" if sentiment_stats else ""}
             {f"- Негативных сообщений: {sentiment_stats.get('negative', 'N/A')}" if sentiment_stats else ""}
-            {f"- Топ фраз: {chr(10).join([f'{p["phrase"]} ({p["count"]})' for p in phrases_stats[:5]])}" if phrases_stats else ""}
+            {f"- Топ фраз: {chr(10).join([f'{p['phrase']} ({p['count']})' for p in phrases_stats[:5]])}" if phrases_stats else ""}
 
             Требования к анализу:
             Используй простой текстовый формат без использования символов форматирования (например, ##, **, ---) и других специальных знаков.
             Remove markdown formatting (##, **, ---)
             Remove markdown formatting ( **word**)
-            1. Выдели  ключевые темы
+            1. Выдели ключевые темы
             2. Укажи общий эмоциональный фон
-            3. Отметь  важные выводы
+            3. Отметь важные выводы
             4. Укажи источники информации
             5. Укажи географию сообщений
             6. Используй простой текстовый формат без markdown разметки
@@ -283,7 +324,7 @@ class LLMReporter(BaseReporter):
             {chr(10).join(messages[:150])}
             """
 
-            # Generate report using the selected provider
+            # Generate short report
             system_message = "Ты аналитик данных, создающий краткие и информативные отчеты с ключевыми выводами."
             report_content = self.provider.generate(
                 prompt,
@@ -294,27 +335,32 @@ class LLMReporter(BaseReporter):
             if not report_content:
                 return "Short LLM report unavailable - generation failed"
 
-            # Сохранение отчета
-            try:
-                self.save_report(report_content, f"short_llm_report_{self.active_geo}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
-                print("Краткий отчет успешно создан.")
-            except Exception as e:
-                print(f"Ошибка сохранения текстового отчета: {e}")
-                raise
+            # Create short report directory
+            short_dir = os.path.join(self.output_dir, self.active_geo, "llm", "short")
+            os.makedirs(short_dir, exist_ok=True)
+            
+            # Create short report file
+            short_report_path = os.path.join(short_dir, "short_report.txt")
+            with open(short_report_path, "w", encoding="utf-8") as f:
+                f.write(report_content)
+            print(f"Saved short report to: {short_report_path}")
 
-            # Генерация PDF версии
+            # Generate PDF version
             try:
                 from src.reporting.pdf_reporter import PDFReporter
+                pdf_short_dir = os.path.join(self.output_dir, self.active_geo, "pdf", "short")
+                os.makedirs(pdf_short_dir, exist_ok=True)
+                
                 pdf_reporter = PDFReporter(
-                    input_data_path=os.path.join(self.input_data_path, self.active_geo, "llm_reports"),
-                    output_dir=os.path.join(self.output_dir, self.active_geo),
+                    input_data_path=short_dir,
+                    output_dir=pdf_short_dir,
                     active_geo=self.active_geo
                 )
                 pdf_reporter.generate_short_report(report_content)
-                print("PDF версия краткого отчета создана.")
+                print(f"PDF short report saved to: {os.path.join(pdf_short_dir, 'short_report.pdf')}")
             except Exception as e:
-                print(f"Ошибка создания PDF отчета: {e}")
-                raise
+                print(f"Ошибка создания PDF отчета: {str(e)}")
+                # Continue even if PDF creation fails
 
             return report_content
 
@@ -328,10 +374,35 @@ class LLMReporter(BaseReporter):
                 error_msg += f"\nНет прав на запись в директорию {self.output_dir}"
             return error_msg
 
+    def save_report(self, content, file_path):
+        """
+        Safely saves report content to the specified file_path.
+        This method is kept but we're using direct file writing in the main methods for clarity.
+        """
+        try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Write content to file
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return True
+        except Exception as e:
+            print(f"Error saving report: {e}")
+            return False
+
 def main():
-    reporter = LLMReporter()
-    report = reporter.generate_report()
-    print(report)
+    # Example usage with required geo parameter
+    reporter = LLMReporter()  # Use a valid geo code
+    print("Generating detailed report...")
+    detailed_report = reporter.generate_report()
+    if detailed_report and detailed_report != "No messages data found":
+        print("Detailed report generated successfully")
+    
+    print("\nGenerating short report...")
+    short_report = reporter.generate_short_report()
+    if short_report and short_report != "No messages data found":
+        print("Short report generated successfully")
 
 if __name__ == "__main__":
     main()

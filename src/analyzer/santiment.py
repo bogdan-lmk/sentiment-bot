@@ -37,7 +37,7 @@ class SentimentAnalyzer:
         else:
             return 'нейтрально'
 
-    def analyze_messages_from_csv(self, df=None, input_path="data/raw/messages.csv", output_path="data/processed/sentiment_analysis.csv"):
+    def analyze_messages_from_csv(self, df=None, input_path="data/raw/{geo}messages_{geo}.csv", output_path="data/processed/{geo}/sentiment_analysis.csv"):
         """Анализирует сообщения из CSV файла или DataFrame и сохраняет результаты"""
         try:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -88,7 +88,7 @@ class SentimentAnalyzer:
             })
         return pd.DataFrame(results)
 
-    def generate_sentiment_report(self, output_path="data/processed/sentiment_report.csv"):
+    def generate_sentiment_report(self, output_path="data/processed/{geo}/sentiment_report.csv"):
         """
         Генерирует отчет по тональности и сохраняет в файл CSV.
         """

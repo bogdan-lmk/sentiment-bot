@@ -104,9 +104,6 @@ def start_reporting():
             logger.error("Processed data files not found in data/processed/")
             return
 
-        # Create visualizations directory if it doesn't exist
-        os.makedirs("reports/visualizations", exist_ok=True)
-
         # Generate visualizations
         from src.visualization.charts import DataVisualizer
         import pandas as pd
@@ -116,43 +113,32 @@ def start_reporting():
         
         for geo in geo_dirs:
             geo_path = os.path.join("data/processed", geo)
-            vis_path = os.path.join("reports/visualizations", geo)
+            vis_path = os.path.join("reports", geo, "visualizations")
             os.makedirs(vis_path, exist_ok=True)
 
             try:
                 # Load geo-specific data
-                sentiment_df = pd.read_csv(f"{geo_path}/sentiment_analysis_{geo}.csv")
-                keywords_df = pd.read_csv(f"{geo_path}/keywords_{geo}.csv")
-                trends_df = pd.read_csv(f"{geo_path}/message_trends_{geo}.csv")
-                clusters_df = pd.read_csv(f"{geo_path}/message_clusters_{geo}.csv")
-                phrases_df = pd.read_csv(f"{geo_path}/top_phrases_{geo}.csv")
+                sentiment_df = pd.read_csv(os.path.join(geo_path, "sentiment_analysis.csv"))
+                keywords_df = pd.read_csv(os.path.join(geo_path, "keywords.csv"))
+                trends_df = pd.read_csv(os.path.join(geo_path, "message_trends.csv"))
+                clusters_df = pd.read_csv(os.path.join(geo_path, "message_clusters.csv"))
+                phrases_df = pd.read_csv(os.path.join(geo_path, "top_phrases.csv"))
 
                 visualizer = DataVisualizer(sentiment_df)
                 
-                fig = visualizer.plot_sentiment_distribution()
-                if fig is not None:
-                    fig.savefig(f"{vis_path}/sentiment_distribution.png")
-                    plt.close(fig)
-                
-                fig = visualizer.plot_top_keywords(keywords_df)
-                if fig is not None:
-                    fig.savefig(f"{vis_path}/top_keywords.png")
-                    plt.close(fig)
-                
-                fig = visualizer.plot_trends(trends_df)
-                if fig is not None:
-                    fig.savefig(f"{vis_path}/message_trends.png")
-                    plt.close(fig)
-                
-                fig = visualizer.plot_clusters(clusters_df)
-                if fig is not None:
-                    fig.savefig(f"{vis_path}/message_clusters.png")
-                    plt.close(fig)
-                
-                fig = visualizer.plot_top_phrases(phrases_df)
-                if fig is not None:
-                    fig.savefig(f"{vis_path}/top_phrases.png")
-                    plt.close(fig)
+                # Generate all visualizations
+                visualizations = [
+                    ("sentiment_distribution.png", visualizer.plot_sentiment_distribution()),
+                    ("top_keywords.png", visualizer.plot_top_keywords(keywords_df)),
+                    ("message_trends.png", visualizer.plot_trends(trends_df)),
+                    ("message_clusters.png", visualizer.plot_clusters(clusters_df)),
+                    ("top_phrases.png", visualizer.plot_top_phrases(phrases_df))
+                ]
+
+                for filename, fig in visualizations:
+                    if fig is not None:
+                        fig.savefig(os.path.join(vis_path, filename))
+                        plt.close(fig)
 
             except Exception as e:
                 logger.error(f"Error processing visualizations for {geo}: {e}")

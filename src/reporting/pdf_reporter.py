@@ -16,10 +16,15 @@ class PDFReporter(BaseReporter):
     """
     
     def __init__(self, input_data_path="data/processed", output_dir="reports", active_geo=None):
-        super().__init__(input_data_path=input_data_path)
-        self.output_dir = output_dir
+        super().__init__(input_data_path=input_data_path, output_dir=output_dir)
+        
+        # Validate geo code before any path operations
+        if not active_geo or active_geo == "--geo":
+            raise ValueError("Invalid geo code provided to PDFReporter")
+        if len(active_geo) != 3 or not active_geo.isalpha():
+            raise ValueError(f"Invalid geo code format: {active_geo}")
+        
         self.active_geo = active_geo
-        os.makedirs(self.output_dir, exist_ok=True)
     
     def _download_font(self):
         """Загрузка и установка шрифта DejaVu с поддержкой Юникода."""
@@ -63,6 +68,10 @@ class PDFReporter(BaseReporter):
             filename (str): Имя файла PDF
             title (str): Заголовок отчета
         """
+        # Define output path
+        output_path = os.path.join(self.output_dir, self.active_geo, "pdf", filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=20)
         pdf.add_page()
@@ -119,43 +128,27 @@ class PDFReporter(BaseReporter):
             pdf.multi_cell(effective_width, line_height, str(report_text), align='L')
         
         # Сохранение PDF
-        # Create geo-specific report directory
-        report_dir = os.path.join(self.output_dir, self.active_geo)
-        os.makedirs(report_dir, exist_ok=True)
-        output_path = os.path.join(report_dir, f"{self.active_geo}_analysis_report.pdf")
         pdf.output(output_path)
         print(f"PDF-отчет сохранен в {output_path}")
         return output_path
     
     def load_data(self, filename):
         """
-        Загружает текстовый файл из reports или data/processed.
+        Загружает текстовый файл из стандартных путей.
         """
-        # First check reports directory
-        report_path = os.path.join("reports", self.active_geo, "llm_reports", filename)
+        # Check in reports/{geo}/llm/ first
+        report_path = os.path.join(self.output_dir, self.active_geo, "llm", filename)
         if os.path.exists(report_path):
             with open(report_path, "r", encoding="utf-8") as f:
                 return f.read()
         
-        # Check geo-specific llm_reports directory
-        geo_processed_path = os.path.join(self.input_data_path, self.active_geo, "llm_reports", filename)
-        if os.path.exists(geo_processed_path):
-            with open(geo_processed_path, "r", encoding="utf-8") as f:
+        # Fall back to data/processed/{geo}/
+        processed_path = os.path.join(self.input_data_path, self.active_geo, filename)
+        if os.path.exists(processed_path):
+            with open(processed_path, "r", encoding="utf-8") as f:
                 return f.read()
         
-        # Fall back to reports directory
-        reports_path = os.path.join(self.output_dir, filename)
-        if os.path.exists(reports_path):
-            with open(reports_path, "r", encoding="utf-8") as f:
-                return f.read()
-        
-        # Finally check geo-specific reports
-        geo_reports_path = os.path.join(self.output_dir, self.active_geo, filename)
-        if os.path.exists(geo_reports_path):
-            with open(geo_reports_path, "r", encoding="utf-8") as f:
-                return f.read()
-        
-        raise FileNotFoundError(f"Файл {filename} не найден в: {report_path}, {geo_processed_path}, {reports_path}, {geo_reports_path}")
+        raise FileNotFoundError(f"Файл {filename} не найден в: {report_path} или {processed_path}")
 
     def generate_report(self, report_text=None, chat_names=None):
         """
@@ -173,7 +166,7 @@ class PDFReporter(BaseReporter):
                 if chat_names:
                     title += f" ({', '.join(chat_names)})"
                 
-                self.generate_pdf_report(report_text, f"llm_report_{self.active_geo}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf", title)
+                self.generate_pdf_report(report_text, "report.pdf", title)
         except Exception as e:
             print(f"Ошибка при создании PDF-отчета: {e}")
 
@@ -193,6 +186,6 @@ class PDFReporter(BaseReporter):
                 if chat_names:
                     title += f" ({', '.join(chat_names)})"
                 
-                self.generate_pdf_report(report_text, f"llm_short_report_{self.active_geo}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf", title)
+                self.generate_pdf_report(report_text, "short_report.pdf", title)
         except Exception as e:
             print(f"Ошибка при создании краткого PDF-отчета: {e}")
