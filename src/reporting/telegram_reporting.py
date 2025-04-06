@@ -75,5 +75,4 @@ class TelegramReporter:
     
 if __name__ == "__main__":
     reporter = TelegramReporter()
-    reporter.send_text_report("Это тестовый отчет.")
     reporter.send_report("reports/llm_report.pdf")

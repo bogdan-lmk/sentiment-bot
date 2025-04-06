@@ -1,116 +1,182 @@
+import sys
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Tuple
+import os
+
+# Add project root directory to Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from telethon.sync import TelegramClient
+from src.data_collector.base_collector import BaseCollector
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+class ClientSessionManager:
+    """Manages pool of Telegram client connections with rate limiting"""
+    def __init__(self, client: TelegramClient, pool_size: int = 5):
+        self.client = client
+        self.semaphore = asyncio.Semaphore(pool_size)
+
+    @asynccontextmanager
+    async def acquire(self) -> AsyncIterator[TelegramClient]:
+        async with self.semaphore:
+            yield self.client
+
+    async def __aenter__(self):
+        await self.client.connect()
+        if not await self.client.is_user_authorized():
+            if not self.phone:
+                raise ValueError("No phone number provided and no valid session exists")
+            await self.client.start(self.phone)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.disconnect()
 import pandas as pd
 import os
 import asyncio
+from config.telegram_config import GEO_GROUPS
 
 logger = logging.getLogger(__name__)
 
-class TelegramParser:
-    def __init__(self):
-        """Initialize Telegram parser with credentials from environment"""
+class TelegramParser(BaseCollector):
+    def __init__(self, geo_group: str = None):
+        """Initialize Telegram parser with credentials and geo-groups
+        Args:
+            geo_group: Specific geo group to process (None for all)
+        """
         api_id = os.getenv("TELEGRAM_API_ID")
         if not api_id:
             raise ValueError("TELEGRAM_API_ID environment variable not set")
         self.api_id = int(api_id)
         self.api_hash = os.getenv("TELEGRAM_API_HASH")
         self.phone = os.getenv("TELEGRAM_PHONE")
-        self.chat_id = '-1002239405289,-1001590941393,-1001200251912,-1001342547202'
+        self.geo_groups = GEO_GROUPS
+        self.target_geo = geo_group
+        self.semaphore = asyncio.Semaphore(5)  # Limit concurrent connections
 
-    async def _fetch_messages(self, output_path: str = "data/raw/messages.csv") -> Optional[List[Dict]]:
-        """Fetch messages from Telegram chat
-        
-        Args:
-            output_path: Path to existing messages CSV file to check for last date
-        """
+    async def _process_geo_group(self, client: TelegramClient, geo_code: str, group_config: dict) -> List[Dict]:
+        """Process messages for a specific geo group"""
+        messages = []
+        try:
+            for chat_id in group_config['chat_ids']:
+                entity = None
+                try:
+                    entity = await client.get_input_entity(chat_id)
+                    if not entity:
+                        raise ValueError(f"Entity not found for chat_id {chat_id}")
+                except Exception as e:
+                    logger.error(f"Error resolving entity {chat_id}: {e}")
+                    continue
+                try:
+                    # Handle different entity types safely
+                    channel_id = getattr(entity, 'channel_id', getattr(entity, 'id', 'unknown'))
+                    title = getattr(entity, 'title', f'Channel#{channel_id}')
+                    # Get entity ID based on type
+                    entity_id = (
+                        entity.channel_id if hasattr(entity, 'channel_id') else
+                        entity.chat_id if hasattr(entity, 'chat_id') else
+                        entity.user_id if hasattr(entity, 'user_id') else
+                        'unknown'
+                    )
+                    logger.info(f"Processing {geo_code} chat: {title} (Type: {type(entity).__name__}, ID: {entity_id})")
+                except Exception as e:
+                    logger.error(f"Error logging channel info: {e}")
+                    continue
+                
+                try:
+                    async for message in client.iter_messages(entity, limit=500):
+                        if message.text and any(kw.lower() in message.text.lower() for kw in group_config['keywords']):
+                            messages.append({
+                                "date": message.date.strftime("%Y-%m-%d %H:%M:%S"),
+                                "author": message.sender_id,
+                                "text": message.text,
+                                "geo_code": geo_code,
+                                "chat_id": chat_id
+                            })
+                except Exception as e:
+                    logger.error(f"Error processing messages in {geo_code} chat {chat_id}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing {geo_code} group: {str(e)}")
+            logger.debug(f"Entity type: {type(entity).__name__} | Entity attributes: {vars(entity)}")
+        return messages
+
+    async def _fetch_messages(self) -> Tuple[List[Dict], List[str]]:
+        """Fetch messages from geo groups with parallel processing"""
         client = TelegramClient('sessions/telegram_session', self.api_id, self.api_hash)
+        messages = []
+        processed_geo = []
+        failed_geo = []
         
         try:
-            # Try connecting with existing session first
             await client.connect()
             if not await client.is_user_authorized():
-                raise ConnectionError("Session invalid")
-        except Exception as e:
-            logger.warning(f"Session invalid: {e}")
-            # Fall back to phone login if session is invalid
-            if not self.phone:
-                raise ValueError("No phone number provided and no valid session exists")
-            await client.start(self.phone)
-        
-        messages = []
-        chat_ids = [cid.strip() for cid in self.chat_id.split(',')]
-        
-        for chat_id in chat_ids:
-            try:
-                # Handle numeric IDs, usernames, and channel IDs with suffixes
-                if '_' in chat_id:
-                    # Keep channel IDs with suffixes as strings
-                    entity = await client.get_entity(chat_id)
-                else:
-                    # Convert regular numeric IDs to integers
-                    chat_id = int(chat_id) if chat_id.lstrip('-').isdigit() else chat_id
-                    entity = await client.get_entity(chat_id)
-                logger.info(f"Successfully accessed chat: {entity.title if hasattr(entity, 'title') else entity.id}")
-                
-                # Get last message date from existing file if it exists
-                last_date = None
-                if os.path.exists(output_path):
-                    try:
-                        existing_df = pd.read_csv(output_path)
-                        if not existing_df.empty:
-                            last_date = pd.to_datetime(existing_df['date']).max()
-                    except Exception as e:
-                        logger.warning(f"Couldn't read existing messages: {e}")
-                
-                # Process messages in batches to avoid rate limits
-                batch_size = 500
-                total_messages = 0
-                async for message in client.iter_messages(entity, limit=1000, offset_date=last_date):
-                    if message.text:
-                        messages.append({
-                            "date": message.date.strftime("%Y-%m-%d %H:%M:%S"),
-                            "author": message.sender_id,
-                            "text": message.text,
-                            "chat_id": chat_id
-                        })
-                        total_messages += 1
-                        
-                        # Stop if we've reached 1000 messages for this chat
-                        if total_messages >= 500:
-                            logger.info(f"Reached 500 message limit for chat {chat_id}")
-                            break
-                            
-                        # Save batch periodically and sleep to avoid rate limits
-                        if len(messages) % batch_size == 0:
-                            logger.info(f"Processed {total_messages} messages from chat {chat_id}")
-                            await asyncio.sleep(1)  # Brief pause between batches
-            except Exception as e:
-                logger.error(f"Failed to fetch messages from chat {chat_id}: {e}")
-                continue
-                
-        return messages if messages else None
+                if not self.phone:
+                    raise ValueError("No phone number provided and no valid session exists")
+                await client.start(self.phone)
 
-    async def parse_messages(self, output_path: str = "data/raw/messages.csv") -> bool:
-        """Parse messages from Telegram group and save to CSV"""
-        logger.info("Fetching messages from Telegram...")
-        messages = await self._fetch_messages(output_path)
+            # Filter geo groups if target specified
+            target_geos = [self.target_geo] if self.target_geo else self.geo_groups.keys()
+
+            # Process geo groups in parallel with connection pool
+            async with ClientSessionManager(client, pool_size=5) as session:
+                tasks = [
+                    self._process_geo_group(session.client, geo_code, group_config)
+                    for geo_code in target_geos
+                    if (group_config := self.geo_groups.get(geo_code))
+                ]
+                
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for geo_code, result in zip(target_geos, results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Failed processing {geo_code}: {str(result)}")
+                        failed_geo.append(geo_code)
+                    elif result:
+                        messages.extend(result)
+                        processed_geo.append(geo_code)
+                if failed_geo:
+                    logger.warning(f"Failed to process {len(failed_geo)} geo groups: {', '.join(failed_geo)}")
+                
+        finally:
+            await client.disconnect()
+            
+        return messages, processed_geo
+    
+    async def run_parser(self) -> bool:
+        """Alias for run() method to maintain compatibility"""
+        return await self.run()
+
+    async def run(self) -> bool:
+        """Main entry point for parsing messages from geo groups"""
+        logger.info("Starting geo-group message parsing...")
+        messages, processed_geo = await self._fetch_messages()
         
         if not messages:
-            logger.warning("No messages found in any chat")
+            logger.warning("No messages found in any geo group")
             return False
             
         try:
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            # Group messages by geo code and save to separate files
             df = pd.DataFrame(messages)
+            geo_codes = df['geo_code'].unique()
             
-            # Append to existing file if it exists
-            if os.path.exists(output_path):
-                existing_df = pd.read_csv(output_path)
-                df = pd.concat([existing_df, df]).drop_duplicates(subset=['date', 'author', 'text', 'chat_id'])
+            for geo_code in geo_codes:
+                geo_df = df[df['geo_code'] == geo_code]
+                output_dir = f"data/raw/{geo_code}"
+                os.makedirs(output_dir, exist_ok=True)
+                output_path = os.path.join(output_dir, f"messages_{geo_code}.csv")
                 
-            df.to_csv(output_path, index=False)
-            logger.info(f"Saved {len(messages)} messages from {len(set(m['chat_id'] for m in messages))} chats to {output_path}")
+                # Append to existing file if it exists
+                if os.path.exists(output_path):
+                    existing_df = pd.read_csv(output_path)
+                    geo_df = pd.concat([existing_df, geo_df]).drop_duplicates(
+                        subset=['date', 'author', 'text', 'chat_id']
+                    )
+                
+                geo_df.to_csv(output_path, index=False)
+                logger.info(f"Saved {len(geo_df)} messages for {geo_code} to {output_path}")
+            
+            logger.info(f"Successfully processed {len(processed_geo)} geo groups")
             return True
         except Exception as e:
             logger.error(f"Failed to save messages: {e}")
@@ -120,4 +186,4 @@ class TelegramParser:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = TelegramParser()
-    asyncio.run(parser.parse_messages())
+    asyncio.run(parser.run())

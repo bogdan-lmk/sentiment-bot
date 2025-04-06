@@ -2,7 +2,8 @@ from fpdf import FPDF
 import os
 import requests
 from pathlib import Path
-from src.reporting.base_reporter import BaseReporter
+from datetime import datetime
+from .base_reporter import BaseReporter
 
 # Path to Unicode font that supports Cyrillic
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "fonts")
@@ -14,11 +15,16 @@ class PDFReporter(BaseReporter):
     Класс для генерации PDF-отчета с улучшенным форматированием и поддержкой Кириллицы.
     """
     
-    def __init__(self, input_data_path="data/processed", output_dir="reports"):
-        super().__init__()
-        self.input_data_path = input_data_path
-        self.output_dir = output_dir
-        os.makedirs(self.output_dir, exist_ok=True)
+    def __init__(self, input_data_path="data/processed", output_dir="reports", active_geo=None):
+        super().__init__(input_data_path=input_data_path, output_dir=output_dir)
+        
+        # Validate geo code before any path operations
+        if not active_geo or active_geo == "--geo":
+            raise ValueError("Invalid geo code provided to PDFReporter")
+        if len(active_geo) != 3 or not active_geo.isalpha():
+            raise ValueError(f"Invalid geo code format: {active_geo}")
+        
+        self.active_geo = active_geo
     
     def _download_font(self):
         """Загрузка и установка шрифта DejaVu с поддержкой Юникода."""
@@ -62,6 +68,10 @@ class PDFReporter(BaseReporter):
             filename (str): Имя файла PDF
             title (str): Заголовок отчета
         """
+        # Define output path
+        output_path = os.path.join(self.output_dir, self.active_geo, "pdf", filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=20)
         pdf.add_page()
@@ -118,28 +128,27 @@ class PDFReporter(BaseReporter):
             pdf.multi_cell(effective_width, line_height, str(report_text), align='L')
         
         # Сохранение PDF
-        output_path = os.path.join(self.output_dir, filename)
         pdf.output(output_path)
         print(f"PDF-отчет сохранен в {output_path}")
         return output_path
     
     def load_data(self, filename):
         """
-        Загружает текстовый файл из reports или data/processed.
+        Загружает текстовый файл из стандартных путей.
         """
-        # First check reports directory
-        reports_path = os.path.join(self.output_dir, filename)
-        if os.path.exists(reports_path):
-            with open(reports_path, "r", encoding="utf-8") as f:
+        # Check in reports/{geo}/llm/ first
+        report_path = os.path.join(self.output_dir, self.active_geo, "llm", filename)
+        if os.path.exists(report_path):
+            with open(report_path, "r", encoding="utf-8") as f:
                 return f.read()
         
-        # Fall back to input data path
-        data_path = os.path.join(self.input_data_path, filename)
-        if os.path.exists(data_path):
-            with open(data_path, "r", encoding="utf-8") as f:
+        # Fall back to data/processed/{geo}/
+        processed_path = os.path.join(self.input_data_path, self.active_geo, filename)
+        if os.path.exists(processed_path):
+            with open(processed_path, "r", encoding="utf-8") as f:
                 return f.read()
         
-        raise FileNotFoundError(f"Файл {filename} не найден ни в {self.output_dir}, ни в {self.input_data_path}")
+        raise FileNotFoundError(f"Файл {filename} не найден в: {report_path} или {processed_path}")
 
     def generate_report(self, report_text=None, chat_names=None):
         """
@@ -157,7 +166,7 @@ class PDFReporter(BaseReporter):
                 if chat_names:
                     title += f" ({', '.join(chat_names)})"
                 
-                self.generate_pdf_report(report_text, "llm_report.pdf", title)
+                self.generate_pdf_report(report_text, "report.pdf", title)
         except Exception as e:
             print(f"Ошибка при создании PDF-отчета: {e}")
 
@@ -177,6 +186,6 @@ class PDFReporter(BaseReporter):
                 if chat_names:
                     title += f" ({', '.join(chat_names)})"
                 
-                self.generate_pdf_report(report_text, "llm_short_report.pdf", title)
+                self.generate_pdf_report(report_text, "short_report.pdf", title)
         except Exception as e:
             print(f"Ошибка при создании краткого PDF-отчета: {e}")
